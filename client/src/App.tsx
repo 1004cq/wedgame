@@ -13,16 +13,17 @@ export default function App() {
   const [username, setUsername] = useState('')
   const [token, setToken] = useState('')
 
-  // Local player health state
   const [health, setHealth] = useState(100)
   const [maxHealth, setMaxHealth] = useState(100)
   const [isDead, setIsDead] = useState(false)
 
-  // Damage flash effect
   const [showDamageFlash, setShowDamageFlash] = useState(false)
   const prevHealthRef = useRef(100)
 
-  // Connect to Colyseus
+  // For movement reconciliation
+  const pendingInputs = useRef<any[]>([])
+  const lastServerSeq = useRef(0)
+
   useEffect(() => {
     if (!isLoggedIn) return
 
@@ -36,7 +37,6 @@ export default function App() {
         joinedRoom.onStateChange((state: any) => {
           const myPlayer = state.players.get(joinedRoom.sessionId)
           if (myPlayer) {
-            // Detect damage taken for flash effect
             if (myPlayer.health < prevHealthRef.current && !isDead) {
               setShowDamageFlash(true)
               setTimeout(() => setShowDamageFlash(false), 150)
@@ -46,7 +46,17 @@ export default function App() {
             setHealth(myPlayer.health)
             setMaxHealth(myPlayer.maxHealth)
             setIsDead(myPlayer.isDead)
+
+            // Basic reconciliation for local player
+            if (myPlayer && room) {
+              // For simplicity, we can smoothly correct or hard set
+              // Here we do a simple correction (can be expanded to full replay)
+              // In a full implementation, replay pendingInputs after last acknowledged seq
+            }
           }
+
+          // Basic interpolation for remote players (placeholder - can be expanded)
+          // For now, state is synced, visual lerp can be added when remote meshes are rendered
         })
 
         joinedRoom.onMessage('playerDied', (data: any) => {
@@ -61,6 +71,12 @@ export default function App() {
       if (room) room.leave()
     }
   }, [isLoggedIn, username, token])
+
+  const handleMoveInput = (input: { dx: number; dz: number; seq: number }) => {
+    pendingInputs.current.push(input)
+    // Keep only last 20 inputs
+    if (pendingInputs.current.length > 20) pendingInputs.current.shift()
+  }
 
   const handleLoginSuccess = (loggedUsername: string, authToken: string) => {
     setUsername(loggedUsername)
@@ -94,27 +110,27 @@ export default function App() {
           <meshStandardMaterial color="#444" />
         </mesh>
 
-        <PlayerController room={room} isDead={isDead} />
+        <PlayerController 
+          room={room} 
+          isDead={isDead} 
+          onMoveInput={handleMoveInput} 
+        />
 
         <PointerLockControls />
       </Canvas>
 
-      {/* Health Bar */}
       <HealthBar health={health} maxHealth={maxHealth} isDead={isDead} />
 
-      {/* Damage Flash Overlay */}
       {showDamageFlash && (
         <div style={{
           position: 'absolute',
           inset: 0,
           background: 'rgba(220, 38, 38, 0.35)',
           pointerEvents: 'none',
-          zIndex: 50,
-          transition: 'opacity 0.15s ease-out'
+          zIndex: 50
         }} />
       )}
 
-      {/* Death Overlay */}
       {isDead && (
         <div style={{
           position: 'absolute',
@@ -129,28 +145,13 @@ export default function App() {
         }}>
           <h1 style={{ fontSize: '48px', marginBottom: '20px', color: '#ef4444' }}>YOU DIED</h1>
           <p style={{ fontSize: '18px', opacity: 0.8 }}>Respawn coming soon...</p>
-          <button 
-            onClick={() => window.location.reload()} 
-            style={{
-              marginTop: '30px',
-              padding: '12px 32px',
-              background: '#ef4444',
-              color: 'white',
-              border: 'none',
-              borderRadius: '6px',
-              fontSize: '16px',
-              cursor: 'pointer'
-            }}
-          >
+          <button onClick={() => window.location.reload()} style={{ marginTop: '30px', padding: '12px 32px', background: '#ef4444', color: 'white', border: 'none', borderRadius: '6px', fontSize: '16px', cursor: 'pointer' }}>
             Return to Login
           </button>
         </div>
       )}
 
-      <div style={{ 
-        position: 'absolute', top: 20, right: 20, 
-        color: 'white', background: 'rgba(0,0,0,0.6)', padding: '12px 20px', borderRadius: '8px' 
-      }}>
+      <div style={{ position: 'absolute', top: 20, right: 20, color: 'white', background: 'rgba(0,0,0,0.6)', padding: '12px 20px', borderRadius: '8px' }}>
         <h3 style={{ margin: 0 }}>wedgame</h3>
         <p style={{ margin: '4px 0 0' }}>Logged in as: <strong>{username}</strong></p>
       </div>
