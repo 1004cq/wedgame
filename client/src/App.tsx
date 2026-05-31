@@ -27,7 +27,6 @@ export default function App() {
   const pendingInputs = useRef<any[]>([])
   const [killFeed, setKillFeed] = useState<any[]>([])
 
-  // Mobile detection
   const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
 
   useEffect(() => {
@@ -81,24 +80,26 @@ export default function App() {
     if (pendingInputs.current.length > 20) pendingInputs.current.shift()
   }
 
-  // Mobile control handlers
   const handleMobileMove = (dx: number, dz: number) => {
     if (room && !isDead) {
-      room.send('move', { dx: dx * 0.3, dz: dz * 0.3 })
+      room.send('move', { dx: dx * 0.28, dz: dz * 0.28 })
     }
   }
 
   const handleMobileJump = () => {
     if (room && !isDead) {
-      // This would need to be handled in PlayerController or via message
-      console.log('Mobile Jump')
+      console.log('Mobile Jump triggered')
     }
   }
 
-  const handleMobileShoot = () => {
+  const handleMobileShootStart = () => {
     if (room && !isDead) {
       room.send('shoot', { targetId: 'none', damage: 25 })
     }
+  }
+
+  const handleMobileShootEnd = () => {
+    // Can be used for stopping continuous fire if needed
   }
 
   const handleMobileCrouch = () => {
@@ -146,13 +147,8 @@ export default function App() {
 
         <Physics gravity={[0, -20, 0]}>
           <Map />
-          <PlayerController 
-            room={room} 
-            isDead={isDead} 
-            onMoveInput={handleMoveInput} 
-          />
+          <PlayerController room={room} isDead={isDead} onMoveInput={handleMoveInput} />
 
-          {/* Remote players */}
           {room && Array.from(room.state.players.entries()).map(([sessionId, player]: [string, any]) => {
             if (sessionId === room.sessionId) return null
             return (
@@ -173,7 +169,6 @@ export default function App() {
 
       <HealthBar health={health} maxHealth={maxHealth} isDead={isDead} />
 
-      {/* Kill Feed */}
       <div style={{ position: 'absolute', top: 80, right: 20, color: 'white', fontSize: '14px', textAlign: 'right' }}>
         {killFeed.map((kill, index) => (
           <div key={index} style={{ marginBottom: '4px' }}>
@@ -186,12 +181,12 @@ export default function App() {
         <div style={{ position: 'absolute', inset: 0, background: 'rgba(220, 38, 38, 0.35)', pointerEvents: 'none', zIndex: 50 }} />
       )}
 
-      {/* Mobile Controls */}
       {isMobile && (
         <MobileControls
           onMove={handleMobileMove}
           onJump={handleMobileJump}
-          onShoot={handleMobileShoot}
+          onShootStart={handleMobileShootStart}
+          onShootEnd={handleMobileShootEnd}
           onCrouch={handleMobileCrouch}
           onReload={handleMobileReload}
         />
@@ -200,10 +195,7 @@ export default function App() {
       {isDead && (
         <div style={{ position: 'absolute', inset: 0, background: 'rgba(0, 0, 0, 0.85)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'white', zIndex: 100 }}>
           <h1 style={{ fontSize: '48px', marginBottom: '20px', color: '#ef4444' }}>YOU DIED</h1>
-          <button 
-            onClick={handleRespawn} 
-            style={{ padding: '14px 40px', background: '#4ade80', color: 'black', border: 'none', borderRadius: '6px', fontSize: '18px', cursor: 'pointer', fontWeight: 'bold' }}
-          >
+          <button onClick={handleRespawn} style={{ padding: '14px 40px', background: '#4ade80', color: 'black', border: 'none', borderRadius: '6px', fontSize: '18px', cursor: 'pointer', fontWeight: 'bold' }}>
             RESPAWN
           </button>
         </div>
