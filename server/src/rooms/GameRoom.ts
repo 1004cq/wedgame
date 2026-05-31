@@ -7,16 +7,13 @@ export class GameRoom extends Room<GameState> {
   onCreate() {
     this.setState(new GameState());
 
-    // Lower patch rate for faster hit/damage feedback (default is ~50ms, we use 20ms)
     this.setPatchRate(20);
 
-    // Register new account
     this.onMessage("register", async (client, data) => {
       const result = await register(data.username, data.password);
       client.send("authResult", result);
     });
 
-    // Login
     this.onMessage("login", async (client, data) => {
       const result = await login(data.username, data.password);
       if (result.success && result.token) {
@@ -26,7 +23,6 @@ export class GameRoom extends Room<GameState> {
       client.send("authResult", result);
     });
 
-    // Movement
     this.onMessage("move", (client, data) => {
       const player = this.state.players.get(client.sessionId);
       if (player && !player.isDead) {
@@ -36,14 +32,33 @@ export class GameRoom extends Room<GameState> {
       }
     });
 
-    // Shooting with health damage
+    // Shooting with distance-based damage falloff (和平精英风格)
     this.onMessage("shoot", (client, data) => {
       const shooter = this.state.players.get(client.sessionId);
       if (!shooter || shooter.isDead) return;
 
       const target = this.state.players.get(data.targetId);
       if (target && !target.isDead) {
-        target.health = Math.max(0, target.health - (data.damage || 25));
+        // 计算距离
+        const dx = shooter.x - target.x;
+        const dz = shooter.z - target.z;
+        const distance = Math.sqrt(dx * dx + dz * dz);
+
+        let damage = data.damage || 25;
+
+        // 距离衰减（类似和平精英）
+        const falloffStart = 25;   // 开始衰减距离
+        const maxFalloff = 80;     // 最大衰减距离
+
+        if (distance > falloffStart) {
+          const falloffRatio = (distance - falloffStart) / (maxFalloff - falloffStart);
+          const falloffFactor = Math.max(0.35, 1 - falloffRatio * 0.65);
+          damage = damage * falloffFactor;
+        }
+
+        target.health = Math.max(0, target.health - damage);
+
+        console.log(`[HIT] ${shooter.name} → ${target.name} | ${damage.toFixed(1)} dmg @ ${distance.toFixed(1)}m`);
 
         if (target.health <= 0 && !target.isDead) {
           target.isDead = true;
@@ -59,7 +74,6 @@ export class GameRoom extends Room<GameState> {
   async onJoin(client: Client, options: any) {
     let username = options.username || `Guest_${client.sessionId.substring(0, 6)}`;
 
-    // Verify token if provided (from login)
     if (options.token) {
       const verification = verifyToken(options.token);
       if (verification.valid && verification.username) {
