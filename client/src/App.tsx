@@ -27,11 +27,11 @@ export default function App() {
   const prevHealthRef = useRef(100)
 
   const pendingInputs = useRef<any[]>([])
+  const lastServerPosition = useRef({ x: 0, y: 0, z: 0 })
   const [killFeed, setKillFeed] = useState<any[]>([])
 
   const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
 
-  // Connect to game room
   const joinGameRoom = async (roomName = 'game') => {
     if (!username || !token) return
 
@@ -43,10 +43,13 @@ export default function App() {
       setRoom(joinedRoom)
       setShowLobby(false)
 
-      // State listeners
       joinedRoom.onStateChange((state: any) => {
         const myPlayer = state.players.get(joinedRoom.sessionId)
         if (myPlayer) {
+          // === 完善服务器校正逻辑 ===
+          const serverPos = { x: myPlayer.x || 0, y: myPlayer.y || 1.5, z: myPlayer.z || 0 }
+          lastServerPosition.current = serverPos
+
           if (myPlayer.health < prevHealthRef.current && !isDead) {
             setShowDamageFlash(true)
             setTimeout(() => setShowDamageFlash(false), 150)
@@ -82,7 +85,6 @@ export default function App() {
   }
 
   const handleCreateRoom = () => {
-    // For now, create a new room instance
     const roomName = `game_${Date.now()}`
     joinGameRoom(roomName)
   }
@@ -108,7 +110,6 @@ export default function App() {
     )
   }
 
-  // Show Lobby after login
   if (showLobby) {
     return (
       <Lobby 
@@ -119,7 +120,6 @@ export default function App() {
     )
   }
 
-  // Game Screen
   return (
     <div style={{ width: '100vw', height: '100vh', position: 'relative' }}>
       <Canvas camera={{ position: [0, 2, 5], fov: 75 }} shadows>
@@ -129,11 +129,16 @@ export default function App() {
 
         <Physics gravity={[0, -20, 0]}>
           <Map />
-          <PlayerController room={room} isDead={isDead} onMoveInput={(input) => {
-            pendingInputs.current.push(input)
-            if (pendingInputs.current.length > 20) pendingInputs.current.shift()
-            if (room) room.send('move', input)
-          }} />
+          <PlayerController 
+            room={room} 
+            isDead={isDead} 
+            serverPosition={lastServerPosition.current}
+            onMoveInput={(input) => {
+              pendingInputs.current.push(input)
+              if (pendingInputs.current.length > 20) pendingInputs.current.shift()
+              if (room) room.send('move', input)
+            }} 
+          />
 
           {room && Array.from(room.state.players.entries()).map(([sessionId, player]: [string, any]) => {
             if (sessionId === room.sessionId) return null
