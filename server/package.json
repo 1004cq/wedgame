@@ -1,7 +1,7 @@
 {
   "name": "wedgame-server",
   "version": "1.0.0",
-  "description": "Colyseus authoritative server for wedgame FPS",
+  "description": "Colyseus authoritative server for wedgame FPS with account system",
   "main": "dist/index.js",
   "scripts": {
     "dev": "ts-node-dev --respawn src/index.ts",
@@ -10,9 +10,13 @@
   },
   "dependencies": {
     "@colyseus/schema": "^3.0.0",
-    "colyseus": "^0.16.0"
+    "bcryptjs": "^2.4.3",
+    "colyseus": "^0.16.0",
+    "jsonwebtoken": "^9.0.0"
   },
   "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/jsonwebtoken": "^9.0.0",
     "@types/node": "^20.0.0",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.0.0"
