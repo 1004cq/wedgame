@@ -8,6 +8,7 @@ import { PlayerController } from './components/PlayerController'
 import LoginForm from './components/LoginForm'
 import HealthBar from './components/HealthBar'
 import { Map } from './components/Map'
+import { RemotePlayer } from './components/RemotePlayer'
 
 export default function App() {
   const [room, setRoom] = useState<any>(null)
@@ -23,7 +24,9 @@ export default function App() {
   const prevHealthRef = useRef(100)
 
   const pendingInputs = useRef<any[]>([])
-  const lastServerSeq = useRef(0)
+
+  // Kill feed
+  const [killFeed, setKillFeed] = useState<any[]>([])
 
   useEffect(() => {
     if (!isLoggedIn) return
@@ -50,7 +53,16 @@ export default function App() {
           }
         })
 
+        // Kill feed
         joinedRoom.onMessage('playerDied', (data: any) => {
+          const killerName = data.killerId === joinedRoom.sessionId ? username : 'Enemy'
+          const victimName = data.victimId === joinedRoom.sessionId ? username : 'Enemy'
+
+          setKillFeed(prev => [
+            ...prev.slice(-4), // Keep last 5
+            { killer: killerName, victim: victimName, time: Date.now() }
+          ])
+
           if (data.victimId === joinedRoom.sessionId) {
             console.log('%c[CLIENT] You were killed!', 'color: #ef4444; font-weight: bold')
           }
@@ -66,6 +78,16 @@ export default function App() {
   const handleMoveInput = (input: { dx: number; dz: number; seq: number }) => {
     pendingInputs.current.push(input)
     if (pendingInputs.current.length > 20) pendingInputs.current.shift()
+  }
+
+  const handleRespawn = () => {
+    if (room && isDead) {
+      // Simple respawn: reset health on client and notify server (basic version)
+      setIsDead(false)
+      setHealth(100)
+      // In a full implementation, send a 'respawn' message to server
+      room.send('respawn')
+    }
   }
 
   const handleLoginSuccess = (loggedUsername: string, authToken: string) => {
@@ -93,12 +115,7 @@ export default function App() {
       <Canvas camera={{ position: [0, 2, 5], fov: 75 }} shadows>
         <Sky />
         <ambientLight intensity={0.4} />
-        <directionalLight 
-          position={[20, 30, 10]} 
-          intensity={1.2} 
-          castShadow 
-          shadow-mapSize={[2048, 2048]}
-        />
+        <directionalLight position={[20, 30, 10]} intensity={1.2} castShadow shadow-mapSize={[2048, 2048]} />
 
         <Physics gravity={[0, -20, 0]}>
           <Map />
@@ -107,6 +124,21 @@ export default function App() {
             isDead={isDead} 
             onMoveInput={handleMoveInput} 
           />
+
+          {/* Render remote players */}
+          {room && Array.from(room.state.players.entries()).map(([sessionId, player]: [string, any]) => {
+            if (sessionId === room.sessionId) return null // Skip local player
+            return (
+              <RemotePlayer
+                key={sessionId}
+                position={{ x: player.x, y: player.y || 1.5, z: player.z }}
+                rotationY={player.rotationY}
+                name={player.name}
+                health={player.health}
+                isDead={player.isDead}
+              />
+            )
+          })}
         </Physics>
 
         <PointerLockControls />
@@ -114,32 +146,27 @@ export default function App() {
 
       <HealthBar health={health} maxHealth={maxHealth} isDead={isDead} />
 
+      {/* Kill Feed */}
+      <div style={{ position: 'absolute', top: 80, right: 20, color: 'white', fontSize: '14px', textAlign: 'right' }}>
+        {killFeed.map((kill, index) => (
+          <div key={index} style={{ marginBottom: '4px' }}>
+            <span style={{ color: '#4ade80' }}>{kill.killer}</span> killed <span style={{ color: '#f87171' }}>{kill.victim}</span>
+          </div>
+        ))}
+      </div>
+
       {showDamageFlash && (
-        <div style={{
-          position: 'absolute',
-          inset: 0,
-          background: 'rgba(220, 38, 38, 0.35)',
-          pointerEvents: 'none',
-          zIndex: 50
-        }} />
+        <div style={{ position: 'absolute', inset: 0, background: 'rgba(220, 38, 38, 0.35)', pointerEvents: 'none', zIndex: 50 }} />
       )}
 
       {isDead && (
-        <div style={{
-          position: 'absolute',
-          inset: 0,
-          background: 'rgba(0, 0, 0, 0.85)',
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color: 'white',
-          zIndex: 100
-        }}>
+        <div style={{ position: 'absolute', inset: 0, background: 'rgba(0, 0, 0, 0.85)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'white', zIndex: 100 }}>
           <h1 style={{ fontSize: '48px', marginBottom: '20px', color: '#ef4444' }}>YOU DIED</h1>
-          <p style={{ fontSize: '18px', opacity: 0.8 }}>Respawn coming soon...</p>
-          <button onClick={() => window.location.reload()} style={{ marginTop: '30px', padding: '12px 32px', background: '#ef4444', color: 'white', border: 'none', borderRadius: '6px', fontSize: '16px', cursor: 'pointer' }}>
-            Return to Login
+          <button 
+            onClick={handleRespawn} 
+            style={{ padding: '14px 40px', background: '#4ade80', color: 'black', border: 'none', borderRadius: '6px', fontSize: '18px', cursor: 'pointer', fontWeight: 'bold' }}
+          >
+            RESPAWN
           </button>
         </div>
       )}
