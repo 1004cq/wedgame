@@ -3,10 +3,19 @@ import { GameState } from "../schema/GameState";
 import { Player } from "../schema/Player";
 import { register, login, verifyToken } from "../auth";
 
+// Position history record for Lag Compensation
+export interface PositionRecord {
+  x: number;
+  z: number;
+  timestamp: number;
+}
+
 export class GameRoom extends Room<GameState> {
+  // Store recent position history for each player (for future Lag Compensation)
+  private positionHistory: Map<string, PositionRecord[]> = new Map();
+
   onCreate() {
     this.setState(new GameState());
-
     this.setPatchRate(20);
 
     this.onMessage("register", async (client, data) => {
@@ -29,26 +38,29 @@ export class GameRoom extends Room<GameState> {
         if (data.dx !== undefined) player.x += data.dx;
         if (data.dz !== undefined) player.z += data.dz;
         if (data.rotationY !== undefined) player.rotationY = data.rotationY;
+
+        // Record position for Lag Compensation
+        this.recordPosition(client.sessionId, player.x, player.z);
       }
     });
 
-    // Shooting with distance-based damage falloff (和平精英风格)
+    // Shooting with distance-based damage falloff
     this.onMessage("shoot", (client, data) => {
       const shooter = this.state.players.get(client.sessionId);
       if (!shooter || shooter.isDead) return;
 
       const target = this.state.players.get(data.targetId);
       if (target && !target.isDead) {
-        // 计算距离
+        // TODO: Add Lag Compensation here using positionHistory
         const dx = shooter.x - target.x;
         const dz = shooter.z - target.z;
         const distance = Math.sqrt(dx * dx + dz * dz);
 
         let damage = data.damage || 25;
 
-        // 距离衰减（类似和平精英）
-        const falloffStart = 25;   // 开始衰减距离
-        const maxFalloff = 80;     // 最大衰减距离
+        // Distance falloff (Peace Elite style)
+        const falloffStart = 25;
+        const maxFalloff = 80;
 
         if (distance > falloffStart) {
           const falloffRatio = (distance - falloffStart) / (maxFalloff - falloffStart);
@@ -71,6 +83,21 @@ export class GameRoom extends Room<GameState> {
     });
   }
 
+  private recordPosition(sessionId: string, x: number, z: number) {
+    if (!this.positionHistory.has(sessionId)) {
+      this.positionHistory.set(sessionId, []);
+    }
+
+    const history = this.positionHistory.get(sessionId)!;
+    history.push({ x, z, timestamp: Date.now() });
+
+    // Keep only last ~300ms of history
+    const cutoff = Date.now() - 300;
+    while (history.length > 0 && history[0].timestamp < cutoff) {
+      history.shift();
+    }
+  }
+
   async onJoin(client: Client, options: any) {
     let username = options.username || `Guest_${client.sessionId.substring(0, 6)}`;
 
@@ -87,10 +114,13 @@ export class GameRoom extends Room<GameState> {
     player.z = Math.random() * 20 - 10;
 
     this.state.players.set(client.sessionId, player);
+    this.positionHistory.set(client.sessionId, []);
+
     console.log(`${username} joined the game`);
   }
 
   onLeave(client: Client) {
     this.state.players.delete(client.sessionId);
+    this.positionHistory.delete(client.sessionId);
   }
 }
