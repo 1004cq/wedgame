@@ -4,9 +4,10 @@ import * as THREE from 'three'
 
 interface PlayerControllerProps {
   room: any
+  isDead?: boolean
 }
 
-export function PlayerController({ room }: PlayerControllerProps) {
+export function PlayerController({ room, isDead = false }: PlayerControllerProps) {
   const meshRef = useRef<THREE.Group>(null!)
   const speed = 0.15
   const keys = useRef({ w: false, a: false, s: false, d: false })
@@ -14,8 +15,10 @@ export function PlayerController({ room }: PlayerControllerProps) {
   const { camera, scene } = useThree()
   const raycaster = useRef(new THREE.Raycaster())
 
-  // Keyboard controls
+  // Keyboard + Shooting controls
   useEffect(() => {
+    if (isDead) return // Disable controls when dead
+
     const handleKeyDown = (e: KeyboardEvent) => {
       const key = e.key.toLowerCase()
       if (key === 'w') keys.current.w = true
@@ -35,7 +38,6 @@ export function PlayerController({ room }: PlayerControllerProps) {
     const handleClick = () => {
       if (!room || !meshRef.current) return
 
-      // Client-side raycast for immediate feedback (prediction)
       raycaster.current.setFromCamera(new THREE.Vector2(0, 0), camera)
       const intersects = raycaster.current.intersectObjects(scene.children, true)
 
@@ -50,14 +52,11 @@ export function PlayerController({ room }: PlayerControllerProps) {
         }
       }
 
-      // Immediate local feedback
       console.log('%c[CLIENT] Shot fired!', 'color: #4ade80')
       if (hitInfo) {
         console.log('%c[CLIENT] Hit detected (client prediction):', 'color: #f87171', hitInfo)
-        // TODO: Add hit effect (blood, hitmarker)
       }
 
-      // Send to server (authoritative)
       room.send('shoot', {
         targetId: hitInfo?.targetId || 'none',
         damage: 25,
@@ -78,11 +77,11 @@ export function PlayerController({ room }: PlayerControllerProps) {
       window.removeEventListener('keyup', handleKeyUp)
       window.removeEventListener('click', handleClick)
     }
-  }, [room, camera, scene])
+  }, [room, camera, scene, isDead])
 
-  // Movement
+  // Movement (disabled when dead)
   useFrame(() => {
-    if (!meshRef.current || !room) return
+    if (!meshRef.current || !room || isDead) return
 
     const input = { dx: 0, dz: 0 }
 
@@ -103,7 +102,7 @@ export function PlayerController({ room }: PlayerControllerProps) {
     <group ref={meshRef}>
       <mesh userData={{ isPlayer: true, sessionId: 'local' }}>
         <capsuleGeometry args={[0.5, 1.5]} />
-        <meshStandardMaterial color="blue" />
+        <meshStandardMaterial color={isDead ? '#666' : 'blue'} />
       </mesh>
     </group>
   )
