@@ -7,6 +7,9 @@ export class GameRoom extends Room<GameState> {
   onCreate() {
     this.setState(new GameState());
 
+    // Lower patch rate for faster hit/damage feedback (default is ~50ms, we use 20ms)
+    this.setPatchRate(20);
+
     // Register new account
     this.onMessage("register", async (client, data) => {
       const result = await register(data.username, data.password);
