@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { PointerLockControls, Sky } from '@react-three/drei'
 import * as Colyseus from 'colyseus.js'
@@ -13,36 +13,42 @@ export default function App() {
   const [username, setUsername] = useState('')
   const [token, setToken] = useState('')
 
-  // Local player health state (synced from server)
+  // Local player health state
   const [health, setHealth] = useState(100)
   const [maxHealth, setMaxHealth] = useState(100)
   const [isDead, setIsDead] = useState(false)
 
-  // Connect to Colyseus when logged in
+  // Damage flash effect
+  const [showDamageFlash, setShowDamageFlash] = useState(false)
+  const prevHealthRef = useRef(100)
+
+  // Connect to Colyseus
   useEffect(() => {
     if (!isLoggedIn) return
 
     const client = new Colyseus.Client('ws://localhost:2567')
 
-    client.joinOrCreate('game', { 
-      username, 
-      token 
-    })
+    client.joinOrCreate('game', { username, token })
       .then(joinedRoom => {
         console.log('Joined game room:', joinedRoom.id)
         setRoom(joinedRoom)
 
-        // Listen for state changes to sync health
         joinedRoom.onStateChange((state: any) => {
           const myPlayer = state.players.get(joinedRoom.sessionId)
           if (myPlayer) {
+            // Detect damage taken for flash effect
+            if (myPlayer.health < prevHealthRef.current && !isDead) {
+              setShowDamageFlash(true)
+              setTimeout(() => setShowDamageFlash(false), 150)
+            }
+            prevHealthRef.current = myPlayer.health
+
             setHealth(myPlayer.health)
             setMaxHealth(myPlayer.maxHealth)
             setIsDead(myPlayer.isDead)
           }
         })
 
-        // Listen for death broadcast
         joinedRoom.onMessage('playerDied', (data: any) => {
           if (data.victimId === joinedRoom.sessionId) {
             console.log('%c[CLIENT] You were killed!', 'color: #ef4444; font-weight: bold')
@@ -93,8 +99,20 @@ export default function App() {
         <PointerLockControls />
       </Canvas>
 
-      {/* Health Bar UI */}
+      {/* Health Bar */}
       <HealthBar health={health} maxHealth={maxHealth} isDead={isDead} />
+
+      {/* Damage Flash Overlay */}
+      {showDamageFlash && (
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          background: 'rgba(220, 38, 38, 0.35)',
+          pointerEvents: 'none',
+          zIndex: 50,
+          transition: 'opacity 0.15s ease-out'
+        }} />
+      )}
 
       {/* Death Overlay */}
       {isDead && (
