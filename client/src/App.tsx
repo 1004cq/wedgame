@@ -10,12 +10,14 @@ import HealthBar from './components/HealthBar'
 import { Map } from './components/Map'
 import { RemotePlayer } from './components/RemotePlayer'
 import MobileControls from './components/MobileControls'
+import Lobby from './components/Lobby'
 
 export default function App() {
   const [room, setRoom] = useState<any>(null)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [username, setUsername] = useState('')
   const [token, setToken] = useState('')
+  const [showLobby, setShowLobby] = useState(true)
 
   const [health, setHealth] = useState(100)
   const [maxHealth, setMaxHealth] = useState(100)
@@ -29,99 +31,67 @@ export default function App() {
 
   const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
 
-  useEffect(() => {
-    if (!isLoggedIn) return
+  // Connect to game room
+  const joinGameRoom = async (roomName = 'game') => {
+    if (!username || !token) return
 
     const client = new Colyseus.Client('ws://localhost:2567')
 
-    client.joinOrCreate('game', { username, token })
-      .then(joinedRoom => {
-        console.log('Joined game room:', joinedRoom.id)
-        setRoom(joinedRoom)
+    try {
+      const joinedRoom = await client.joinOrCreate(roomName, { username, token })
+      console.log('Joined game room:', joinedRoom.id)
+      setRoom(joinedRoom)
+      setShowLobby(false)
 
-        joinedRoom.onStateChange((state: any) => {
-          const myPlayer = state.players.get(joinedRoom.sessionId)
-          if (myPlayer) {
-            if (myPlayer.health < prevHealthRef.current && !isDead) {
-              setShowDamageFlash(true)
-              setTimeout(() => setShowDamageFlash(false), 150)
-            }
-            prevHealthRef.current = myPlayer.health
-
-            setHealth(myPlayer.health)
-            setMaxHealth(myPlayer.maxHealth)
-            setIsDead(myPlayer.isDead)
+      // State listeners
+      joinedRoom.onStateChange((state: any) => {
+        const myPlayer = state.players.get(joinedRoom.sessionId)
+        if (myPlayer) {
+          if (myPlayer.health < prevHealthRef.current && !isDead) {
+            setShowDamageFlash(true)
+            setTimeout(() => setShowDamageFlash(false), 150)
           }
-        })
+          prevHealthRef.current = myPlayer.health
 
-        joinedRoom.onMessage('playerDied', (data: any) => {
-          const killerName = data.killerId === joinedRoom.sessionId ? username : 'Enemy'
-          const victimName = data.victimId === joinedRoom.sessionId ? username : 'Enemy'
-
-          setKillFeed(prev => [
-            ...prev.slice(-4),
-            { killer: killerName, victim: victimName, time: Date.now() }
-          ])
-
-          if (data.victimId === joinedRoom.sessionId) {
-            console.log('%c[CLIENT] You were killed!', 'color: #ef4444; font-weight: bold')
-          }
-        })
+          setHealth(myPlayer.health)
+          setMaxHealth(myPlayer.maxHealth)
+          setIsDead(myPlayer.isDead)
+        }
       })
-      .catch(err => console.error('Failed to join room:', err))
 
-    return () => {
-      if (room) room.leave()
-    }
-  }, [isLoggedIn, username, token])
+      joinedRoom.onMessage('playerDied', (data: any) => {
+        const killerName = data.killerId === joinedRoom.sessionId ? username : 'Enemy'
+        const victimName = data.victimId === joinedRoom.sessionId ? username : 'Enemy'
 
-  const handleMoveInput = (input: { dx: number; dz: number; seq: number }) => {
-    pendingInputs.current.push(input)
-    if (pendingInputs.current.length > 20) pendingInputs.current.shift()
-  }
+        setKillFeed(prev => [
+          ...prev.slice(-4),
+          { killer: killerName, victim: victimName, time: Date.now() }
+        ])
 
-  const handleMobileMove = (dx: number, dz: number) => {
-    if (room && !isDead) {
-      room.send('move', { dx: dx * 0.28, dz: dz * 0.28 })
-    }
-  }
-
-  const handleMobileJump = () => {
-    if (room && !isDead) {
-      console.log('Mobile Jump triggered')
+        if (data.victimId === joinedRoom.sessionId) {
+          console.log('%c[CLIENT] You were killed!', 'color: #ef4444; font-weight: bold')
+        }
+      })
+    } catch (err) {
+      console.error('Failed to join room:', err)
     }
   }
 
-  const handleMobileShootStart = () => {
-    if (room && !isDead) {
-      room.send('shoot', { targetId: 'none', damage: 25 })
-    }
+  const handleQuickJoin = () => {
+    joinGameRoom('game')
   }
 
-  const handleMobileShootEnd = () => {
-    // Can be used for stopping continuous fire if needed
-  }
-
-  const handleMobileCrouch = () => {
-    console.log('Crouch')
-  }
-
-  const handleMobileReload = () => {
-    console.log('Reload')
-  }
-
-  const handleRespawn = () => {
-    if (room && isDead) {
-      setIsDead(false)
-      setHealth(100)
-      room.send('respawn')
-    }
+  const handleCreateRoom = () => {
+    // For now, create a new room instance
+    const roomName = `game_${Date.now()}`
+    joinGameRoom(roomName)
   }
 
   const handleLoginSuccess = (loggedUsername: string, authToken: string) => {
     setUsername(loggedUsername)
     setToken(authToken)
     setIsLoggedIn(true)
+    setShowLobby(true)
   }
 
   if (!isLoggedIn) {
@@ -138,6 +108,18 @@ export default function App() {
     )
   }
 
+  // Show Lobby after login
+  if (showLobby) {
+    return (
+      <Lobby 
+        username={username} 
+        onQuickJoin={handleQuickJoin} 
+        onCreateRoom={handleCreateRoom} 
+      />
+    )
+  }
+
+  // Game Screen
   return (
     <div style={{ width: '100vw', height: '100vh', position: 'relative' }}>
       <Canvas camera={{ position: [0, 2, 5], fov: 75 }} shadows>
@@ -147,7 +129,11 @@ export default function App() {
 
         <Physics gravity={[0, -20, 0]}>
           <Map />
-          <PlayerController room={room} isDead={isDead} onMoveInput={handleMoveInput} />
+          <PlayerController room={room} isDead={isDead} onMoveInput={(input) => {
+            pendingInputs.current.push(input)
+            if (pendingInputs.current.length > 20) pendingInputs.current.shift()
+            if (room) room.send('move', input)
+          }} />
 
           {room && Array.from(room.state.players.entries()).map(([sessionId, player]: [string, any]) => {
             if (sessionId === room.sessionId) return null
@@ -183,19 +169,23 @@ export default function App() {
 
       {isMobile && (
         <MobileControls
-          onMove={handleMobileMove}
-          onJump={handleMobileJump}
-          onShootStart={handleMobileShootStart}
-          onShootEnd={handleMobileShootEnd}
-          onCrouch={handleMobileCrouch}
-          onReload={handleMobileReload}
+          onMove={(dx, dz) => room && room.send('move', { dx: dx * 0.28, dz: dz * 0.28 })}
+          onJump={() => console.log('Jump')}
+          onShootStart={() => room && room.send('shoot', { targetId: 'none', damage: 25 })}
+          onShootEnd={() => {}}
+          onCrouch={() => console.log('Crouch')}
+          onReload={() => console.log('Reload')}
         />
       )}
 
       {isDead && (
         <div style={{ position: 'absolute', inset: 0, background: 'rgba(0, 0, 0, 0.85)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'white', zIndex: 100 }}>
           <h1 style={{ fontSize: '48px', marginBottom: '20px', color: '#ef4444' }}>YOU DIED</h1>
-          <button onClick={handleRespawn} style={{ padding: '14px 40px', background: '#4ade80', color: 'black', border: 'none', borderRadius: '6px', fontSize: '18px', cursor: 'pointer', fontWeight: 'bold' }}>
+          <button onClick={() => {
+            setIsDead(false)
+            setHealth(100)
+            if (room) room.send('respawn')
+          }} style={{ padding: '14px 40px', background: '#4ade80', color: 'black', border: 'none', borderRadius: '6px', fontSize: '18px', cursor: 'pointer', fontWeight: 'bold' }}>
             RESPAWN
           </button>
         </div>
