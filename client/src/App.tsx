@@ -32,7 +32,6 @@ export default function App() {
 
   const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
 
-  // Get server URL from environment variable (supports easy deployment)
   const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'ws://localhost:2567'
 
   const joinGameRoom = async (roomName = 'game') => {
@@ -161,6 +160,53 @@ export default function App() {
       </Canvas>
 
       <HealthBar health={health} maxHealth={maxHealth} isDead={isDead} />
+
+      {/* Crosshair */}
+      <div style={{
+        position: 'absolute',
+        top: '50%',
+        left: '50%',
+        transform: 'translate(-50%, -50%)',
+        width: '20px',
+        height: '20px',
+        pointerEvents: 'none',
+        zIndex: 50
+      }}>
+        <div style={{ position: 'absolute', top: '50%', left: '0', width: '100%', height: '2px', background: 'white', opacity: 0.85 }}></div>
+        <div style={{ position: 'absolute', left: '50%', top: '0', width: '2px', height: '100%', background: 'white', opacity: 0.85 }}></div>
+      </div>
+
+      {/* Hitmarker */}
+      <div id="hitmarker" style={{
+        position: 'absolute',
+        top: '50%',
+        left: '50%',
+        transform: 'translate(-50%, -50%)',
+        width: '28px',
+        height: '28px',
+        border: '2px solid #ef4444',
+        borderRadius: '50%',
+        opacity: 0,
+        pointerEvents: 'none',
+        transition: 'opacity 0.15s ease-out',
+        zIndex: 60
+      }}></div>
+
+      {/* Ammo Display */}
+      <div style={{
+        position: 'absolute',
+        bottom: '20px',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        color: 'white',
+        background: 'rgba(0,0,0,0.6)',
+        padding: '6px 16px',
+        borderRadius: '4px',
+        fontSize: '16px',
+        fontFamily: 'monospace'
+      }}>
+        AMMO
+      </div>
 
       <div style={{ position: 'absolute', top: 80, right: 20, color: 'white', fontSize: '14px', textAlign: 'right' }}>
         {killFeed.map((kill, index) => (
