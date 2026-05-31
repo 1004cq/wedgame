@@ -1,12 +1,13 @@
 import { useEffect, useState, useRef } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { PointerLockControls, Sky } from '@react-three/drei'
-import { Physics, RigidBody, CuboidCollider } from '@react-three/rapier'
+import { Physics } from '@react-three/rapier'
 import * as Colyseus from 'colyseus.js'
 
 import { PlayerController } from './components/PlayerController'
 import LoginForm from './components/LoginForm'
 import HealthBar from './components/HealthBar'
+import { Map } from './components/Map'
 
 export default function App() {
   const [room, setRoom] = useState<any>(null)
@@ -89,21 +90,18 @@ export default function App() {
 
   return (
     <div style={{ width: '100vw', height: '100vh', position: 'relative' }}>
-      <Canvas camera={{ position: [0, 2, 5], fov: 75 }}>
+      <Canvas camera={{ position: [0, 2, 5], fov: 75 }} shadows>
         <Sky />
-        <ambientLight intensity={0.5} />
-        <directionalLight position={[10, 20, 10]} intensity={1} />
+        <ambientLight intensity={0.4} />
+        <directionalLight 
+          position={[20, 30, 10]} 
+          intensity={1.2} 
+          castShadow 
+          shadow-mapSize={[2048, 2048]}
+        />
 
         <Physics gravity={[0, -20, 0]}>
-          {/* Ground */}
-          <RigidBody type="fixed" position={[0, -0.5, 0]}>
-            <CuboidCollider args={[50, 0.5, 50]} />
-            <mesh>
-              <boxGeometry args={[100, 1, 100]} />
-              <meshStandardMaterial color="#555" />
-            </mesh>
-          </RigidBody>
-
+          <Map />
           <PlayerController 
             room={room} 
             isDead={isDead} 
