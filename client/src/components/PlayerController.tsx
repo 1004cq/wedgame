@@ -18,11 +18,12 @@ export function PlayerController({ room, isDead = false, serverPosition, onMoveI
   const inputSeq = useRef(0)
   const grounded = useRef(true)
   const lastReconciledTime = useRef(0)
+  const inputHistory = useRef<any[]>([])
 
   const { camera, scene } = useThree()
   const raycaster = useRef(new THREE.Raycaster())
 
-  const createHumanoidModel = () => { /* ... keep existing improved model ... */ }
+  const createHumanoidModel = () => { /* keep existing improved model */ }
 
   const createMuzzleFlash = () => { /* keep existing */ }
   const createHitEffect = (point: THREE.Vector3) => { /* keep existing */ }
@@ -51,7 +52,6 @@ export function PlayerController({ room, isDead = false, serverPosition, onMoveI
     const handleClick = () => {
       if (!room) return
       createMuzzleFlash()
-      // shooting logic
       room.send('shoot', { targetId: 'none', damage: 25 })
     }
 
@@ -73,19 +73,39 @@ export function PlayerController({ room, isDead = false, serverPosition, onMoveI
     const linvel = body.linvel()
     const position = body.translation()
 
-    // === 服务器校正逻辑 ===
+    // === 加强的服务器校正 + 输入重放 ===
     if (serverPosition) {
-      const dist = Math.hypot(
-        position.x - serverPosition.x,
-        position.z - serverPosition.z
-      )
+      const dist = Math.hypot(position.x - serverPosition.x, position.z - serverPosition.z)
 
-      // 如果偏差较大，进行校正（每 300ms 最多校正一次，避免抖动）
-      const now = Date.now()
-      if (dist > 1.5 && now - lastReconciledTime.current > 300) {
-        body.setTranslation(serverPosition, true)
-        lastReconciledTime.current = now
+      if (dist > 1.2) {
+        const now = Date.now()
+        if (now - lastReconciledTime.current > 250) {
+          body.setTranslation(serverPosition, true)
+
+          // 重放最近输入
+          inputHistory.current.forEach((input) => {
+            const currentVel = body.linvel()
+            body.setLinvel({
+              x: currentVel.x + (input.dx || 0) * speed * 6,
+              y: currentVel.y,
+              z: currentVel.z + (input.dz || 0) * speed * 6
+            }, true)
+          })
+
+          lastReconciledTime.current = now
+          inputHistory.current = []
+        }
       }
+    }
+
+    // 记录输入历史
+    if (keys.current.w || keys.current.s || keys.current.a || keys.current.d) {
+      const currentInput = {
+        dx: (keys.current.d ? 1 : 0) - (keys.current.a ? 1 : 0),
+        dz: (keys.current.s ? 1 : 0) - (keys.current.w ? 1 : 0)
+      }
+      inputHistory.current.push(currentInput)
+      if (inputHistory.current.length > 10) inputHistory.current.shift()
     }
 
     // Ground check
@@ -93,13 +113,11 @@ export function PlayerController({ room, isDead = false, serverPosition, onMoveI
     const groundHits = raycaster.current.intersectObjects(scene.children, true)
     grounded.current = groundHits.length > 0 && groundHits[0].distance < 1.5
 
-    // Jumping
     if (keys.current.space && grounded.current) {
       body.applyImpulse({ x: 0, y: jumpForce, z: 0 }, true)
       keys.current.space = false
     }
 
-    // Movement
     let moveX = 0
     let moveZ = 0
     if (keys.current.w) moveZ -= 1
@@ -119,14 +137,12 @@ export function PlayerController({ room, isDead = false, serverPosition, onMoveI
       z: moveZ * speed
     }, true)
 
-    // Send input
     if (Math.abs(moveX) > 0.1 || Math.abs(moveZ) > 0.1) {
       const seq = ++inputSeq.current
       room.send('move', { dx: moveX * speed * 0.016, dz: moveZ * speed * 0.016, seq })
       if (onMoveInput) onMoveInput({ dx: moveX * speed * 0.016, dz: moveZ * speed * 0.016, seq })
     }
 
-    // Camera follow
     camera.position.x = position.x
     camera.position.z = position.z
     camera.position.y = position.y + 2.8
