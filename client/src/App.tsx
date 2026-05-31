@@ -32,10 +32,13 @@ export default function App() {
 
   const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
 
+  // Get server URL from environment variable (supports easy deployment)
+  const SERVER_URL = import.meta.env.VITE_SERVER_URL || 'ws://localhost:2567'
+
   const joinGameRoom = async (roomName = 'game') => {
     if (!username || !token) return
 
-    const client = new Colyseus.Client('ws://localhost:2567')
+    const client = new Colyseus.Client(SERVER_URL)
 
     try {
       const joinedRoom = await client.joinOrCreate(roomName, { username, token })
@@ -46,7 +49,6 @@ export default function App() {
       joinedRoom.onStateChange((state: any) => {
         const myPlayer = state.players.get(joinedRoom.sessionId)
         if (myPlayer) {
-          // === 完善服务器校正逻辑 ===
           const serverPos = { x: myPlayer.x || 0, y: myPlayer.y || 1.5, z: myPlayer.z || 0 }
           lastServerPosition.current = serverPos
 
