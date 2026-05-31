@@ -4,36 +4,58 @@ import { PointerLockControls, Sky } from '@react-three/drei'
 import * as Colyseus from 'colyseus.js'
 
 import { PlayerController } from './components/PlayerController'
+import LoginForm from './components/LoginForm'
 
-// Simple connection to Colyseus server
-function useColyseus() {
+export default function App() {
   const [room, setRoom] = useState<any>(null)
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [username, setUsername] = useState('')
+  const [token, setToken] = useState('')
 
+  // Connect to Colyseus when logged in
   useEffect(() => {
+    if (!isLoggedIn) return
+
     const client = new Colyseus.Client('ws://localhost:2567')
 
-    client.joinOrCreate('game', { name: 'Player' + Math.floor(Math.random()*1000) })
-      .then(room => {
-        console.log('Joined room:', room.id)
-        setRoom(room)
+    client.joinOrCreate('game', { 
+      username, 
+      token 
+    })
+      .then(joinedRoom => {
+        console.log('Joined game room:', joinedRoom.id)
+        setRoom(joinedRoom)
 
-        // Listen for state changes (will expand later)
-        room.onStateChange((state: any) => {
-          console.log('State updated', state.players)
+        joinedRoom.onStateChange((state: any) => {
+          // Future: sync players, health, etc.
         })
       })
-      .catch(err => console.error('Connection error:', err))
+      .catch(err => console.error('Failed to join room:', err))
 
     return () => {
       if (room) room.leave()
     }
-  }, [])
+  }, [isLoggedIn, username, token])
 
-  return room
-}
+  const handleLoginSuccess = (loggedUsername: string, authToken: string) => {
+    setUsername(loggedUsername)
+    setToken(authToken)
+    setIsLoggedIn(true)
+  }
 
-export default function App() {
-  const room = useColyseus()
+  if (!isLoggedIn) {
+    return (
+      <div style={{ width: '100vw', height: '100vh', background: '#111' }}>
+        <LoginForm 
+          onLoginSuccess={handleLoginSuccess} 
+          room={room}
+        />
+        <div style={{ position: 'absolute', bottom: 40, width: '100%', textAlign: 'center', color: '#888' }}>
+          wedgame - Web FPS (Account Login System)
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div style={{ width: '100vw', height: '100vh' }}>
@@ -42,22 +64,23 @@ export default function App() {
         <ambientLight intensity={0.5} />
         <directionalLight position={[10, 20, 10]} intensity={1} />
 
-        {/* Simple ground */}
         <mesh rotation={[-Math.PI * 0.5, 0, 0]} position={[0, 0, 0]}>
           <planeGeometry args={[100, 100]} />
-          <meshStandardMaterial color="#555" />
+          <meshStandardMaterial color="#444" />
         </mesh>
 
-        {/* Local player controller (basic) */}
         <PlayerController room={room} />
 
         <PointerLockControls />
       </Canvas>
 
-      <div style={{ position: 'absolute', top: 20, left: 20, color: 'white', background: 'rgba(0,0,0,0.5)', padding: '10px' }}>
-        <h2>wedgame - Web FPS</h2>
-        <p>Click to lock pointer • WASD to move</p>
-        {room && <p>Connected to room: {room.id}</p>}
+      <div style={{ 
+        position: 'absolute', top: 20, left: 20, 
+        color: 'white', background: 'rgba(0,0,0,0.6)', padding: '12px 20px', borderRadius: '8px' 
+      }}>
+        <h3 style={{ margin: 0 }}>wedgame</h3>
+        <p style={{ margin: '4px 0 0' }}>Logged in as: <strong>{username}</strong></p>
+        <p style={{ fontSize: '12px', opacity: 0.7 }}>Click to lock mouse • WASD to move</p>
       </div>
     </div>
   )
