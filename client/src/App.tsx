@@ -167,13 +167,13 @@ export default function App() {
         top: '50%',
         left: '50%',
         transform: 'translate(-50%, -50%)',
-        width: '20px',
-        height: '20px',
+        width: '22px',
+        height: '22px',
         pointerEvents: 'none',
         zIndex: 50
       }}>
-        <div style={{ position: 'absolute', top: '50%', left: '0', width: '100%', height: '2px', background: 'white', opacity: 0.85 }}></div>
-        <div style={{ position: 'absolute', left: '50%', top: '0', width: '2px', height: '100%', background: 'white', opacity: 0.85 }}></div>
+        <div style={{ position: 'absolute', top: '50%', left: '0', width: '100%', height: '2px', background: '#fff', opacity: 0.9 }}></div>
+        <div style={{ position: 'absolute', left: '50%', top: '0', width: '2px', height: '100%', background: '#fff', opacity: 0.9 }}></div>
       </div>
 
       {/* Hitmarker */}
@@ -182,35 +182,43 @@ export default function App() {
         top: '50%',
         left: '50%',
         transform: 'translate(-50%, -50%)',
-        width: '28px',
-        height: '28px',
-        border: '2px solid #ef4444',
+        width: '32px',
+        height: '32px',
+        border: '3px solid #ef4444',
         borderRadius: '50%',
         opacity: 0,
         pointerEvents: 'none',
-        transition: 'opacity 0.15s ease-out',
+        transition: 'opacity 0.1s ease-out',
         zIndex: 60
       }}></div>
 
-      {/* Ammo Display */}
+      {/* Bottom HUD - Weapon & Ammo */}
       <div style={{
         position: 'absolute',
-        bottom: '20px',
+        bottom: '15px',
         left: '50%',
         transform: 'translateX(-50%)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: '20px',
+        background: 'rgba(0,0,0,0.7)',
+        padding: '10px 28px',
+        borderRadius: '10px',
         color: 'white',
-        background: 'rgba(0,0,0,0.6)',
-        padding: '6px 16px',
-        borderRadius: '4px',
-        fontSize: '16px',
-        fontFamily: 'monospace'
+        fontFamily: 'system-ui, sans-serif',
+        zIndex: 70,
+        boxShadow: '0 4px 20px rgba(0,0,0,0.4)'
       }}>
-        AMMO
+        <div style={{ fontSize: '14px', opacity: 0.7, letterSpacing: '1.5px' }}>WEAPON</div>
+        <div style={{ fontSize: '24px', fontWeight: '700', color: '#4ade80', letterSpacing: '1px' }}>AKM</div>
+        <div style={{ width: '1px', height: '26px', background: 'rgba(255,255,255,0.25)' }}></div>
+        <div style={{ fontSize: '22px', fontFamily: 'monospace', fontWeight: '600' }}>30 / 30</div>
       </div>
 
-      <div style={{ position: 'absolute', top: 80, right: 20, color: 'white', fontSize: '14px', textAlign: 'right' }}>
+      {/* Kill Feed */}
+      <div style={{ position: 'absolute', top: 80, right: 20, color: 'white', fontSize: '14px', textAlign: 'right', zIndex: 80, textShadow: '1px 1px 3px rgba(0,0,0,0.8)' }}>
         {killFeed.map((kill, index) => (
-          <div key={index} style={{ marginBottom: '4px' }}>
+          <div key={index} style={{ marginBottom: '5px' }}>
             <span style={{ color: '#4ade80' }}>{kill.killer}</span> killed <span style={{ color: '#f87171' }}>{kill.victim}</span>
           </div>
         ))}
@@ -244,7 +252,7 @@ export default function App() {
         </div>
       )}
 
-      <div style={{ position: 'absolute', top: 20, right: 20, color: 'white', background: 'rgba(0,0,0,0.6)', padding: '12px 20px', borderRadius: '8px' }}>
+      <div style={{ position: 'absolute', top: 20, right: 20, color: 'white', background: 'rgba(0,0,0,0.6)', padding: '12px 20px', borderRadius: '8px', zIndex: 90 }}>
         <h3 style={{ margin: 0 }}>wedgame</h3>
         <p style={{ margin: '4px 0 0' }}>Logged in as: <strong>{username}</strong></p>
       </div>
