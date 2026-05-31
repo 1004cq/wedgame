@@ -5,12 +5,18 @@ import * as Colyseus from 'colyseus.js'
 
 import { PlayerController } from './components/PlayerController'
 import LoginForm from './components/LoginForm'
+import HealthBar from './components/HealthBar'
 
 export default function App() {
   const [room, setRoom] = useState<any>(null)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const [username, setUsername] = useState('')
   const [token, setToken] = useState('')
+
+  // Local player health state (synced from server)
+  const [health, setHealth] = useState(100)
+  const [maxHealth, setMaxHealth] = useState(100)
+  const [isDead, setIsDead] = useState(false)
 
   // Connect to Colyseus when logged in
   useEffect(() => {
@@ -26,8 +32,21 @@ export default function App() {
         console.log('Joined game room:', joinedRoom.id)
         setRoom(joinedRoom)
 
+        // Listen for state changes to sync health
         joinedRoom.onStateChange((state: any) => {
-          // Future: sync players, health, etc.
+          const myPlayer = state.players.get(joinedRoom.sessionId)
+          if (myPlayer) {
+            setHealth(myPlayer.health)
+            setMaxHealth(myPlayer.maxHealth)
+            setIsDead(myPlayer.isDead)
+          }
+        })
+
+        // Listen for death broadcast
+        joinedRoom.onMessage('playerDied', (data: any) => {
+          if (data.victimId === joinedRoom.sessionId) {
+            console.log('%c[CLIENT] You were killed!', 'color: #ef4444; font-weight: bold')
+          }
         })
       })
       .catch(err => console.error('Failed to join room:', err))
@@ -58,7 +77,7 @@ export default function App() {
   }
 
   return (
-    <div style={{ width: '100vw', height: '100vh' }}>
+    <div style={{ width: '100vw', height: '100vh', position: 'relative' }}>
       <Canvas camera={{ position: [0, 2, 5], fov: 75 }}>
         <Sky />
         <ambientLight intensity={0.5} />
@@ -69,18 +88,53 @@ export default function App() {
           <meshStandardMaterial color="#444" />
         </mesh>
 
-        <PlayerController room={room} />
+        <PlayerController room={room} isDead={isDead} />
 
         <PointerLockControls />
       </Canvas>
 
+      {/* Health Bar UI */}
+      <HealthBar health={health} maxHealth={maxHealth} isDead={isDead} />
+
+      {/* Death Overlay */}
+      {isDead && (
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          background: 'rgba(0, 0, 0, 0.85)',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          color: 'white',
+          zIndex: 100
+        }}>
+          <h1 style={{ fontSize: '48px', marginBottom: '20px', color: '#ef4444' }}>YOU DIED</h1>
+          <p style={{ fontSize: '18px', opacity: 0.8 }}>Respawn coming soon...</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            style={{
+              marginTop: '30px',
+              padding: '12px 32px',
+              background: '#ef4444',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              fontSize: '16px',
+              cursor: 'pointer'
+            }}
+          >
+            Return to Login
+          </button>
+        </div>
+      )}
+
       <div style={{ 
-        position: 'absolute', top: 20, left: 20, 
+        position: 'absolute', top: 20, right: 20, 
         color: 'white', background: 'rgba(0,0,0,0.6)', padding: '12px 20px', borderRadius: '8px' 
       }}>
         <h3 style={{ margin: 0 }}>wedgame</h3>
         <p style={{ margin: '4px 0 0' }}>Logged in as: <strong>{username}</strong></p>
-        <p style={{ fontSize: '12px', opacity: 0.7 }}>Click to lock mouse • WASD to move</p>
       </div>
     </div>
   )
