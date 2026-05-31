@@ -15,9 +15,54 @@ export function PlayerController({ room, isDead = false }: PlayerControllerProps
   const { camera, scene } = useThree()
   const raycaster = useRef(new THREE.Raycaster())
 
+  // Create muzzle flash effect
+  const createMuzzleFlash = () => {
+    const flash = new THREE.Mesh(
+      new THREE.SphereGeometry(0.15, 8, 8),
+      new THREE.MeshBasicMaterial({ color: 0xffffaa, transparent: true, opacity: 0.9 })
+    )
+    
+    // Position in front of camera (gun position)
+    const direction = new THREE.Vector3()
+    camera.getWorldDirection(direction)
+    flash.position.copy(camera.position).add(direction.multiplyScalar(1.5))
+    
+    scene.add(flash)
+
+    // Remove after short time
+    setTimeout(() => {
+      scene.remove(flash)
+      flash.geometry.dispose()
+      ;(flash.material as THREE.Material).dispose()
+    }, 80)
+  }
+
+  // Create hit effect at point
+  const createHitEffect = (point: THREE.Vector3) => {
+    const hit = new THREE.Mesh(
+      new THREE.SphereGeometry(0.2, 8, 8),
+      new THREE.MeshBasicMaterial({ color: 0xff4444, transparent: true, opacity: 0.8 })
+    )
+    hit.position.copy(point)
+    scene.add(hit)
+
+    // Quick fade out
+    let scale = 1
+    const interval = setInterval(() => {
+      scale -= 0.15
+      hit.scale.set(scale, scale, scale)
+      if (scale <= 0) {
+        clearInterval(interval)
+        scene.remove(hit)
+        hit.geometry.dispose()
+        ;(hit.material as THREE.Material).dispose()
+      }
+    }, 30)
+  }
+
   // Keyboard + Shooting controls
   useEffect(() => {
-    if (isDead) return // Disable controls when dead
+    if (isDead) return
 
     const handleKeyDown = (e: KeyboardEvent) => {
       const key = e.key.toLowerCase()
@@ -38,6 +83,9 @@ export function PlayerController({ room, isDead = false }: PlayerControllerProps
     const handleClick = () => {
       if (!room || !meshRef.current) return
 
+      // Muzzle flash (always on shoot)
+      createMuzzleFlash()
+
       raycaster.current.setFromCamera(new THREE.Vector2(0, 0), camera)
       const intersects = raycaster.current.intersectObjects(scene.children, true)
 
@@ -46,15 +94,17 @@ export function PlayerController({ room, isDead = false }: PlayerControllerProps
         if (intersect.object.userData.isPlayer) {
           hitInfo = {
             targetId: intersect.object.userData.sessionId || 'self',
-            point: intersect.point
+            point: intersect.point.clone()
           }
           break
         }
       }
 
-      console.log('%c[CLIENT] Shot fired!', 'color: #4ade80')
+      console.log('%c[CLIENT] Shot fired! Muzzle flash shown.', 'color: #4ade80')
+
       if (hitInfo) {
-        console.log('%c[CLIENT] Hit detected (client prediction):', 'color: #f87171', hitInfo)
+        console.log('%c[CLIENT] Hit detected!', 'color: #f87171', hitInfo)
+        createHitEffect(hitInfo.point) // Visual hit feedback
       }
 
       room.send('shoot', {
@@ -79,7 +129,7 @@ export function PlayerController({ room, isDead = false }: PlayerControllerProps
     }
   }, [room, camera, scene, isDead])
 
-  // Movement (disabled when dead)
+  // Movement
   useFrame(() => {
     if (!meshRef.current || !room || isDead) return
 
