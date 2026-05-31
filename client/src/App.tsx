@@ -9,6 +9,7 @@ import LoginForm from './components/LoginForm'
 import HealthBar from './components/HealthBar'
 import { Map } from './components/Map'
 import { RemotePlayer } from './components/RemotePlayer'
+import MobileControls from './components/MobileControls'
 
 export default function App() {
   const [room, setRoom] = useState<any>(null)
@@ -24,9 +25,10 @@ export default function App() {
   const prevHealthRef = useRef(100)
 
   const pendingInputs = useRef<any[]>([])
-
-  // Kill feed
   const [killFeed, setKillFeed] = useState<any[]>([])
+
+  // Mobile detection
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
 
   useEffect(() => {
     if (!isLoggedIn) return
@@ -53,13 +55,12 @@ export default function App() {
           }
         })
 
-        // Kill feed
         joinedRoom.onMessage('playerDied', (data: any) => {
           const killerName = data.killerId === joinedRoom.sessionId ? username : 'Enemy'
           const victimName = data.victimId === joinedRoom.sessionId ? username : 'Enemy'
 
           setKillFeed(prev => [
-            ...prev.slice(-4), // Keep last 5
+            ...prev.slice(-4),
             { killer: killerName, victim: victimName, time: Date.now() }
           ])
 
@@ -80,12 +81,38 @@ export default function App() {
     if (pendingInputs.current.length > 20) pendingInputs.current.shift()
   }
 
+  // Mobile control handlers
+  const handleMobileMove = (dx: number, dz: number) => {
+    if (room && !isDead) {
+      room.send('move', { dx: dx * 0.3, dz: dz * 0.3 })
+    }
+  }
+
+  const handleMobileJump = () => {
+    if (room && !isDead) {
+      // This would need to be handled in PlayerController or via message
+      console.log('Mobile Jump')
+    }
+  }
+
+  const handleMobileShoot = () => {
+    if (room && !isDead) {
+      room.send('shoot', { targetId: 'none', damage: 25 })
+    }
+  }
+
+  const handleMobileCrouch = () => {
+    console.log('Crouch')
+  }
+
+  const handleMobileReload = () => {
+    console.log('Reload')
+  }
+
   const handleRespawn = () => {
     if (room && isDead) {
-      // Simple respawn: reset health on client and notify server (basic version)
       setIsDead(false)
       setHealth(100)
-      // In a full implementation, send a 'respawn' message to server
       room.send('respawn')
     }
   }
@@ -125,9 +152,9 @@ export default function App() {
             onMoveInput={handleMoveInput} 
           />
 
-          {/* Render remote players */}
+          {/* Remote players */}
           {room && Array.from(room.state.players.entries()).map(([sessionId, player]: [string, any]) => {
-            if (sessionId === room.sessionId) return null // Skip local player
+            if (sessionId === room.sessionId) return null
             return (
               <RemotePlayer
                 key={sessionId}
@@ -157,6 +184,17 @@ export default function App() {
 
       {showDamageFlash && (
         <div style={{ position: 'absolute', inset: 0, background: 'rgba(220, 38, 38, 0.35)', pointerEvents: 'none', zIndex: 50 }} />
+      )}
+
+      {/* Mobile Controls */}
+      {isMobile && (
+        <MobileControls
+          onMove={handleMobileMove}
+          onJump={handleMobileJump}
+          onShoot={handleMobileShoot}
+          onCrouch={handleMobileCrouch}
+          onReload={handleMobileReload}
+        />
       )}
 
       {isDead && (
