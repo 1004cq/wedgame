@@ -1,77 +1,60 @@
 # wedgame
 
-**Web-based FPS Game** inspired by *Peace Elite* (PUBG Mobile) / *Valorant*.
+**High-performance Web FPS Game** inspired by Peace Elite (PUBG Mobile).
 
-A high-performance browser FPS built with modern web technologies: **Three.js + React Three Fiber + WebGPU**.
+Built with **Three.js + React Three Fiber + WebGPU** on the client and **Colyseus** for authoritative multiplayer.
 
-## 🚀 Goals
-- Smooth first-person shooter mechanics in the browser
-- Strong shooting feel and authoritative-style physics (client prediction + server reconciliation)
-- WebGPU rendering pipeline for maximum performance
-- Scalable to multiplayer (WebSockets / Colyseus / custom server)
-- Beautiful visuals with custom shaders, post-processing, and effects
+## Project Structure
 
-## Tech Stack
-- **Frontend**: React 19 + Vite
-- **3D Graphics**: Three.js + @react-three/fiber + @react-three/drei + @react-three/rapier (physics)
-- **Rendering**: WebGPU (with fallback to WebGL)
-- **Shaders**: WGSL
-- **Multiplayer** (planned): Socket.io / Colyseus + authoritative server
-- **State**: Zustand or Jotai
-- **UI**: Tailwind / shadcn or custom
-
-## Project Structure (planned)
 ```
 wedgame/
-├─ src/
-│   ├─ components/     # Player, Weapon, Scene, UI
-│   ├─ hooks/          # useKeyboard, usePointerLock, usePhysics
-│   ├─ systems/        # Shooting, Networking, Rendering
-│   ├─ shaders/        # WGSL files
-│   └─ App.tsx
-├─ public/
-├─ package.json
-├─ vite.config.ts
+├─ server/                 # Colyseus authoritative server
+│   ├─ src/
+│   │   ├─ schema/          # Player, GameState
+│   │   ├─ rooms/           # GameRoom logic
+│   │   └─ index.ts
+│   └─ package.json
+├─ client/                 # Three.js + React frontend
+│   ├─ src/
+│   │   ├─ components/
+│   │   ├─ systems/         # Network, Prediction, etc.
+│   │   ├─ App.tsx
+│   │   └─ main.tsx
+│   └─ package.json
+├─ shared/                 # Common types (optional)
 └─ README.md
 ```
 
 ## Getting Started
 
+### 1. Server
 ```bash
-# Clone the repo
-git clone https://github.com/1004cq/wedgame.git
-cd wedgame
-
-# Install dependencies
+cd server
 npm install
-
-# Run dev server
 npm run dev
 ```
 
-Open http://localhost:5173
+### 2. Client
+```bash
+cd client
+npm install
+npm run dev
+```
 
-## Current Status
-- [x] Repository created
-- [ ] Basic Three.js + R3F scene with PointerLockControls
-- [ ] Player movement + physics (Rapier)
-- [ ] Weapon system + raycast shooting
-- [ ] WebGPU render pipeline integration
-- [ ] Simple multiplayer prototype
+Open http://localhost:5173 (client) and connect to ws://localhost:2567
 
-## Roadmap
-1. Single-player prototype (movement, shooting, basic map)
-2. Add models, animations, effects (gun recoil, muzzle flash, hit markers)
-3. WebGPU shaders & post-processing
-4. Multiplayer foundation (prediction + reconciliation)
-5. Polish, UI, matchmaking
+## Current Progress
+- [x] Repository & basic structure
+- [ ] Colyseus server setup (GameRoom + Player Schema)
+- [ ] Three.js + R3F client scene
+- [ ] Basic movement synchronization
+- [ ] Health (HP) system
+- [ ] Shooting & hit detection
 
-## Contributing
-Pull requests and issues are welcome! This is an experimental high-performance web FPS project.
+## Tech Stack
+- **Client**: React 19, Vite, Three.js, @react-three/fiber, @react-three/rapier, WebGPU
+- **Server**: Node.js, Colyseus, @colyseus/schema
+- **Multiplayer**: Authoritative server + Client Prediction + Reconciliation
 
-## License
-MIT (or your choice)
-
----
-
-Built with passion for web gaming 🎮
+## Next Steps
+Follow the implementation in commits or ask me to continue building specific parts.
