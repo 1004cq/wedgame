@@ -192,7 +192,7 @@ export default function App() {
         zIndex: 60
       }}></div>
 
-      {/* Bottom HUD - Weapon & Ammo */}
+      {/* Bottom HUD - Weapon with Icon + Ammo */}
       <div style={{
         position: 'absolute',
         bottom: '15px',
@@ -200,19 +200,35 @@ export default function App() {
         transform: 'translateX(-50%)',
         display: 'flex',
         alignItems: 'center',
-        gap: '20px',
-        background: 'rgba(0,0,0,0.7)',
-        padding: '10px 28px',
-        borderRadius: '10px',
+        gap: '18px',
+        background: 'rgba(0,0,0,0.75)',
+        padding: '10px 26px',
+        borderRadius: '12px',
         color: 'white',
         fontFamily: 'system-ui, sans-serif',
         zIndex: 70,
-        boxShadow: '0 4px 20px rgba(0,0,0,0.4)'
+        boxShadow: '0 6px 25px rgba(0,0,0,0.5)'
       }}>
-        <div style={{ fontSize: '14px', opacity: 0.7, letterSpacing: '1.5px' }}>WEAPON</div>
-        <div style={{ fontSize: '24px', fontWeight: '700', color: '#4ade80', letterSpacing: '1px' }}>AKM</div>
-        <div style={{ width: '1px', height: '26px', background: 'rgba(255,255,255,0.25)' }}></div>
-        <div style={{ fontSize: '22px', fontFamily: 'monospace', fontWeight: '600' }}>30 / 30</div>
+        {/* Weapon Icon + Name */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          {/* Simple Rifle SVG Icon */}
+          <svg width="44" height="18" viewBox="0 0 44 18" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect x="3" y="7" width="26" height="5" rx="1.5" fill="#4ade80"/>
+            <rect x="29" y="5" width="12" height="9" rx="2" fill="#4ade80"/>
+            <rect x="9" y="3" width="5" height="3" fill="#166534"/>
+            <circle cx="38" cy="9.5" r="2" fill="#166534"/>
+          </svg>
+          <div>
+            <div style={{ fontSize: '12px', opacity: 0.65, letterSpacing: '1.2px' }}>WEAPON</div>
+            <div style={{ fontSize: '21px', fontWeight: '700', color: '#4ade80', lineHeight: '1' }}>AKM</div>
+          </div>
+        </div>
+
+        <div style={{ width: '1px', height: '30px', background: 'rgba(255,255,255,0.25)' }}></div>
+
+        <div style={{ fontSize: '22px', fontFamily: 'monospace', fontWeight: '600' }}>
+          30 / 30
+        </div>
       </div>
 
       {/* Kill Feed */}
