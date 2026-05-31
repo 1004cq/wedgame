@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  server:
+    build: ./server
+    ports:
+      - "2567:2567"
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+
+  # Uncomment below if you want to serve the client with nginx
+  # client:
+  #   build: ./client
+  #   ports:
+  #     - "80:80"
