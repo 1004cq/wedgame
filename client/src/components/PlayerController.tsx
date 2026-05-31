@@ -17,7 +17,6 @@ export function PlayerController({ room, isDead = false, serverPosition, onMoveI
   const keys = useRef({ w: false, a: false, s: false, d: false, space: false, r: false })
   const inputSeq = useRef(0)
   const grounded = useRef(true)
-  const lastReconciledTime = useRef(0)
   const inputHistory = useRef<any[]>([])
 
   // Weapon + Ammo System
@@ -45,7 +44,6 @@ export function PlayerController({ room, isDead = false, serverPosition, onMoveI
       if (e.key === ' ') { keys.current.space = true; e.preventDefault() }
       if (key === 'r') keys.current.r = true
 
-      // Weapon switching
       if (key === '1') setCurrentWeapon('akm')
       if (key === '2') setCurrentWeapon('awm')
     }
@@ -78,7 +76,6 @@ export function PlayerController({ room, isDead = false, serverPosition, onMoveI
         weapon: currentWeapon 
       })
 
-      // Consume ammo
       setAmmo(prev => ({
         ...prev,
         [currentWeapon]: prev[currentWeapon] - 1
@@ -96,15 +93,12 @@ export function PlayerController({ room, isDead = false, serverPosition, onMoveI
     }
   }, [room, isDead, currentWeapon, ammo])
 
-  // Reload logic
+  // Reload
   useEffect(() => {
     if (keys.current.r && !isDead) {
       const weapon = currentWeapon
       if (ammo[weapon] < maxAmmo[weapon]) {
-        setAmmo(prev => ({
-          ...prev,
-          [weapon]: maxAmmo[weapon]
-        }))
+        setAmmo(prev => ({ ...prev, [weapon]: maxAmmo[weapon] }))
         console.log(`%c[RELOAD] ${weapon.toUpperCase()} reloaded`, 'color: #4ade80')
       }
       keys.current.r = false
@@ -118,38 +112,37 @@ export function PlayerController({ room, isDead = false, serverPosition, onMoveI
     const linvel = body.linvel()
     const position = body.translation()
 
-    // Server reconciliation
+    // === 完善客户端预测 + 服务器校正 + 输入重放 ===
     if (serverPosition) {
       const dist = Math.hypot(position.x - serverPosition.x, position.z - serverPosition.z)
 
-      if (dist > 1.2) {
-        const now = Date.now()
-        if (now - lastReconciledTime.current > 250) {
-          body.setTranslation(serverPosition, true)
+      if (dist > 1.0) {
+        body.setTranslation(serverPosition, true)
 
-          inputHistory.current.forEach((input) => {
-            const currentVel = body.linvel()
-            body.setLinvel({
-              x: currentVel.x + (input.dx || 0) * speed * 6,
-              y: currentVel.y,
-              z: currentVel.z + (input.dz || 0) * speed * 6
-            }, true)
-          })
+        // 重放最近输入（客户端预测核心）
+        inputHistory.current.forEach((input) => {
+          const vel = body.linvel()
+          body.setLinvel({
+            x: vel.x + (input.dx || 0) * speed * 5,
+            y: vel.y,
+            z: vel.z + (input.dz || 0) * speed * 5
+          }, true)
+        })
 
-          lastReconciledTime.current = now
-          inputHistory.current = []
-        }
+        inputHistory.current = []
       }
     }
 
-    // Record input history
+    // 记录输入历史
     if (keys.current.w || keys.current.s || keys.current.a || keys.current.d) {
       const currentInput = {
         dx: (keys.current.d ? 1 : 0) - (keys.current.a ? 1 : 0),
-        dz: (keys.current.s ? 1 : 0) - (keys.current.w ? 1 : 0)
+        dz: (keys.current.s ? 1 : 0) - (keys.current.w ? 1 : 0),
+        time: Date.now()
       }
       inputHistory.current.push(currentInput)
-      if (inputHistory.current.length > 10) inputHistory.current.shift()
+
+      if (inputHistory.current.length > 12) inputHistory.current.shift()
     }
 
     // Ground check
