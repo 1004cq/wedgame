@@ -70,10 +70,13 @@ export function PlayerController({ room, isDead = false, serverPosition, onMoveI
       createMuzzleFlash()
 
       const weaponDamage = currentWeapon === 'akm' ? 28 : 85
+
+      // Send timestamp for Lag Compensation
       room.send('shoot', { 
         targetId: 'none', 
         damage: weaponDamage,
-        weapon: currentWeapon 
+        weapon: currentWeapon,
+        timestamp: Date.now()
       })
 
       setAmmo(prev => ({
@@ -112,14 +115,13 @@ export function PlayerController({ room, isDead = false, serverPosition, onMoveI
     const linvel = body.linvel()
     const position = body.translation()
 
-    // === 完善客户端预测 + 服务器校正 + 输入重放 ===
+    // Server reconciliation + input replay
     if (serverPosition) {
       const dist = Math.hypot(position.x - serverPosition.x, position.z - serverPosition.z)
 
       if (dist > 1.0) {
         body.setTranslation(serverPosition, true)
 
-        // 重放最近输入（客户端预测核心）
         inputHistory.current.forEach((input) => {
           const vel = body.linvel()
           body.setLinvel({
@@ -133,7 +135,7 @@ export function PlayerController({ room, isDead = false, serverPosition, onMoveI
       }
     }
 
-    // 记录输入历史
+    // Record input history
     if (keys.current.w || keys.current.s || keys.current.a || keys.current.d) {
       const currentInput = {
         dx: (keys.current.d ? 1 : 0) - (keys.current.a ? 1 : 0),
