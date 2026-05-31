@@ -5,31 +5,27 @@ import * as THREE from 'three'
 interface PlayerControllerProps {
   room: any
   isDead?: boolean
+  onMoveInput?: (input: { dx: number; dz: number; seq: number }) => void
 }
 
-export function PlayerController({ room, isDead = false }: PlayerControllerProps) {
+export function PlayerController({ room, isDead = false, onMoveInput }: PlayerControllerProps) {
   const meshRef = useRef<THREE.Group>(null!)
   const speed = 0.15
   const keys = useRef({ w: false, a: false, s: false, d: false })
+  const inputSeq = useRef(0)
 
   const { camera, scene } = useThree()
   const raycaster = useRef(new THREE.Raycaster())
 
-  // Create muzzle flash effect
   const createMuzzleFlash = () => {
     const flash = new THREE.Mesh(
       new THREE.SphereGeometry(0.15, 8, 8),
       new THREE.MeshBasicMaterial({ color: 0xffffaa, transparent: true, opacity: 0.9 })
     )
-    
-    // Position in front of camera (gun position)
     const direction = new THREE.Vector3()
     camera.getWorldDirection(direction)
     flash.position.copy(camera.position).add(direction.multiplyScalar(1.5))
-    
     scene.add(flash)
-
-    // Remove after short time
     setTimeout(() => {
       scene.remove(flash)
       flash.geometry.dispose()
@@ -37,7 +33,6 @@ export function PlayerController({ room, isDead = false }: PlayerControllerProps
     }, 80)
   }
 
-  // Create hit effect at point
   const createHitEffect = (point: THREE.Vector3) => {
     const hit = new THREE.Mesh(
       new THREE.SphereGeometry(0.2, 8, 8),
@@ -45,8 +40,6 @@ export function PlayerController({ room, isDead = false }: PlayerControllerProps
     )
     hit.position.copy(point)
     scene.add(hit)
-
-    // Quick fade out
     let scale = 1
     const interval = setInterval(() => {
       scale -= 0.15
@@ -60,7 +53,6 @@ export function PlayerController({ room, isDead = false }: PlayerControllerProps
     }, 30)
   }
 
-  // Keyboard + Shooting controls
   useEffect(() => {
     if (isDead) return
 
@@ -83,7 +75,6 @@ export function PlayerController({ room, isDead = false }: PlayerControllerProps
     const handleClick = () => {
       if (!room || !meshRef.current) return
 
-      // Muzzle flash (always on shoot)
       createMuzzleFlash()
 
       raycaster.current.setFromCamera(new THREE.Vector2(0, 0), camera)
@@ -92,29 +83,18 @@ export function PlayerController({ room, isDead = false }: PlayerControllerProps
       let hitInfo = null
       for (const intersect of intersects) {
         if (intersect.object.userData.isPlayer) {
-          hitInfo = {
-            targetId: intersect.object.userData.sessionId || 'self',
-            point: intersect.point.clone()
-          }
+          hitInfo = { targetId: intersect.object.userData.sessionId || 'self', point: intersect.point.clone() }
           break
         }
       }
 
-      console.log('%c[CLIENT] Shot fired! Muzzle flash shown.', 'color: #4ade80')
-
-      if (hitInfo) {
-        console.log('%c[CLIENT] Hit detected!', 'color: #f87171', hitInfo)
-        createHitEffect(hitInfo.point) // Visual hit feedback
-      }
+      console.log('%c[CLIENT] Shot fired!', 'color: #4ade80')
+      if (hitInfo) createHitEffect(hitInfo.point)
 
       room.send('shoot', {
         targetId: hitInfo?.targetId || 'none',
         damage: 25,
-        direction: {
-          x: camera.getWorldDirection(new THREE.Vector3()).x,
-          y: camera.getWorldDirection(new THREE.Vector3()).y,
-          z: camera.getWorldDirection(new THREE.Vector3()).z
-        }
+        direction: { x: camera.getWorldDirection(new THREE.Vector3()).x, y: camera.getWorldDirection(new THREE.Vector3()).y, z: camera.getWorldDirection(new THREE.Vector3()).z }
       })
     }
 
@@ -129,7 +109,6 @@ export function PlayerController({ room, isDead = false }: PlayerControllerProps
     }
   }, [room, camera, scene, isDead])
 
-  // Movement
   useFrame(() => {
     if (!meshRef.current || !room || isDead) return
 
@@ -144,7 +123,9 @@ export function PlayerController({ room, isDead = false }: PlayerControllerProps
     meshRef.current.position.z += input.dz
 
     if (input.dx !== 0 || input.dz !== 0) {
-      room.send('move', input)
+      const seq = ++inputSeq.current
+      room.send('move', { ...input, seq })
+      if (onMoveInput) onMoveInput({ ...input, seq })
     }
   })
 
