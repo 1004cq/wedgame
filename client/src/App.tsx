@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { PointerLockControls, Sky } from '@react-three/drei'
+import { Physics, RigidBody, CuboidCollider } from '@react-three/rapier'
 import * as Colyseus from 'colyseus.js'
 
 import { PlayerController } from './components/PlayerController'
@@ -20,7 +21,6 @@ export default function App() {
   const [showDamageFlash, setShowDamageFlash] = useState(false)
   const prevHealthRef = useRef(100)
 
-  // For movement reconciliation
   const pendingInputs = useRef<any[]>([])
   const lastServerSeq = useRef(0)
 
@@ -46,17 +46,7 @@ export default function App() {
             setHealth(myPlayer.health)
             setMaxHealth(myPlayer.maxHealth)
             setIsDead(myPlayer.isDead)
-
-            // Basic reconciliation for local player
-            if (myPlayer && room) {
-              // For simplicity, we can smoothly correct or hard set
-              // Here we do a simple correction (can be expanded to full replay)
-              // In a full implementation, replay pendingInputs after last acknowledged seq
-            }
           }
-
-          // Basic interpolation for remote players (placeholder - can be expanded)
-          // For now, state is synced, visual lerp can be added when remote meshes are rendered
         })
 
         joinedRoom.onMessage('playerDied', (data: any) => {
@@ -74,7 +64,6 @@ export default function App() {
 
   const handleMoveInput = (input: { dx: number; dz: number; seq: number }) => {
     pendingInputs.current.push(input)
-    // Keep only last 20 inputs
     if (pendingInputs.current.length > 20) pendingInputs.current.shift()
   }
 
@@ -105,16 +94,22 @@ export default function App() {
         <ambientLight intensity={0.5} />
         <directionalLight position={[10, 20, 10]} intensity={1} />
 
-        <mesh rotation={[-Math.PI * 0.5, 0, 0]} position={[0, 0, 0]}>
-          <planeGeometry args={[100, 100]} />
-          <meshStandardMaterial color="#444" />
-        </mesh>
+        <Physics gravity={[0, -20, 0]}>
+          {/* Ground */}
+          <RigidBody type="fixed" position={[0, -0.5, 0]}>
+            <CuboidCollider args={[50, 0.5, 50]} />
+            <mesh>
+              <boxGeometry args={[100, 1, 100]} />
+              <meshStandardMaterial color="#555" />
+            </mesh>
+          </RigidBody>
 
-        <PlayerController 
-          room={room} 
-          isDead={isDead} 
-          onMoveInput={handleMoveInput} 
-        />
+          <PlayerController 
+            room={room} 
+            isDead={isDead} 
+            onMoveInput={handleMoveInput} 
+          />
+        </Physics>
 
         <PointerLockControls />
       </Canvas>
