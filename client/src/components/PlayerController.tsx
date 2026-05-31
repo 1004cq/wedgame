@@ -14,19 +14,21 @@ export function PlayerController({ room, isDead = false, serverPosition, onMoveI
   const rigidBodyRef = useRef<any>(null!)
   const speed = 8
   const jumpForce = 12
-  const keys = useRef({ w: false, a: false, s: false, d: false, space: false })
+  const keys = useRef({ w: false, a: false, s: false, d: false, space: false, r: false })
   const inputSeq = useRef(0)
   const grounded = useRef(true)
   const lastReconciledTime = useRef(0)
   const inputHistory = useRef<any[]>([])
 
-  // Weapon system
+  // Weapon + Ammo System
   const [currentWeapon, setCurrentWeapon] = useState<'akm' | 'awm'>('akm')
+  const [ammo, setAmmo] = useState({ akm: 30, awm: 5 })
+  const maxAmmo = { akm: 30, awm: 5 }
 
   const { camera, scene } = useThree()
   const raycaster = useRef(new THREE.Raycaster())
 
-  const createHumanoidModel = () => { /* keep existing improved model */ }
+  const createHumanoidModel = () => { /* keep existing */ }
 
   const createMuzzleFlash = () => { /* keep existing */ }
   const createHitEffect = (point: THREE.Vector3) => { /* keep existing */ }
@@ -41,8 +43,9 @@ export function PlayerController({ room, isDead = false, serverPosition, onMoveI
       if (key === 's') keys.current.s = true
       if (key === 'd') keys.current.d = true
       if (e.key === ' ') { keys.current.space = true; e.preventDefault() }
+      if (key === 'r') keys.current.r = true
 
-      // Weapon switching (1 = AKM, 2 = AWM)
+      // Weapon switching
       if (key === '1') setCurrentWeapon('akm')
       if (key === '2') setCurrentWeapon('awm')
     }
@@ -54,19 +57,32 @@ export function PlayerController({ room, isDead = false, serverPosition, onMoveI
       if (key === 's') keys.current.s = false
       if (key === 'd') keys.current.d = false
       if (e.key === ' ') keys.current.space = false
+      if (key === 'r') keys.current.r = false
     }
 
     const handleClick = () => {
-      if (!room) return
+      if (!room || isDead) return
+
+      const currentAmmo = ammo[currentWeapon]
+      if (currentAmmo <= 0) {
+        console.log('%c[AMMO] Out of ammo! Press R to reload', 'color: #fbbf24')
+        return
+      }
+
       createMuzzleFlash()
 
-      // Different damage based on weapon
       const weaponDamage = currentWeapon === 'akm' ? 28 : 85
       room.send('shoot', { 
         targetId: 'none', 
         damage: weaponDamage,
         weapon: currentWeapon 
       })
+
+      // Consume ammo
+      setAmmo(prev => ({
+        ...prev,
+        [currentWeapon]: prev[currentWeapon] - 1
+      }))
     }
 
     window.addEventListener('keydown', handleKeyDown)
@@ -78,7 +94,22 @@ export function PlayerController({ room, isDead = false, serverPosition, onMoveI
       window.removeEventListener('keyup', handleKeyUp)
       window.removeEventListener('click', handleClick)
     }
-  }, [room, isDead, currentWeapon])
+  }, [room, isDead, currentWeapon, ammo])
+
+  // Reload logic
+  useEffect(() => {
+    if (keys.current.r && !isDead) {
+      const weapon = currentWeapon
+      if (ammo[weapon] < maxAmmo[weapon]) {
+        setAmmo(prev => ({
+          ...prev,
+          [weapon]: maxAmmo[weapon]
+        }))
+        console.log(`%c[RELOAD] ${weapon.toUpperCase()} reloaded`, 'color: #4ade80')
+      }
+      keys.current.r = false
+    }
+  }, [keys.current.r])
 
   useFrame(() => {
     if (!rigidBodyRef.current || !room || isDead) return
