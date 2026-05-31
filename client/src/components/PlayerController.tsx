@@ -20,6 +20,89 @@ export function PlayerController({ room, isDead = false, onMoveInput }: PlayerCo
   const { camera, scene } = useThree()
   const raycaster = useRef(new THREE.Raycaster())
 
+  // Create a better humanoid model (closer to Peace Elite style)
+  const createHumanoidModel = () => {
+    const group = new THREE.Group()
+
+    // Head
+    const head = new THREE.Mesh(
+      new THREE.SphereGeometry(0.45, 16, 16),
+      new THREE.MeshStandardMaterial({ color: '#f5d0c5' })
+    )
+    head.position.y = 2.3
+    group.add(head)
+
+    // Helmet / Hat (like Peace Elite)
+    const helmet = new THREE.Mesh(
+      new THREE.SphereGeometry(0.48, 16, 16),
+      new THREE.MeshStandardMaterial({ color: '#1f2937' })
+    )
+    helmet.position.y = 2.35
+    helmet.scale.set(1, 0.6, 1)
+    group.add(helmet)
+
+    // Torso (military vest style)
+    const torso = new THREE.Mesh(
+      new THREE.BoxGeometry(1.1, 1.5, 0.7),
+      new THREE.MeshStandardMaterial({ color: '#1e40af' })
+    )
+    torso.position.y = 1.2
+    group.add(torso)
+
+    // Arms
+    const leftArm = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.22, 0.22, 1.3, 8),
+      new THREE.MeshStandardMaterial({ color: '#1e3a8a' })
+    )
+    leftArm.position.set(-0.85, 1.2, 0)
+    leftArm.rotation.z = 0.4
+    group.add(leftArm)
+
+    const rightArm = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.22, 0.22, 1.3, 8),
+      new THREE.MeshStandardMaterial({ color: '#1e3a8a' })
+    )
+    rightArm.position.set(0.85, 1.2, 0)
+    rightArm.rotation.z = -0.4
+    group.add(rightArm)
+
+    // Legs
+    const leftLeg = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.28, 0.28, 1.2, 8),
+      new THREE.MeshStandardMaterial({ color: '#111827' })
+    )
+    leftLeg.position.set(-0.35, 0.25, 0)
+    group.add(leftLeg)
+
+    const rightLeg = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.28, 0.28, 1.2, 8),
+      new THREE.MeshStandardMaterial({ color: '#111827' })
+    )
+    rightLeg.position.set(0.35, 0.25, 0)
+    group.add(rightLeg)
+
+    // Weapon (M4 style rifle)
+    const weapon = new THREE.Group()
+    const gunBody = new THREE.Mesh(
+      new THREE.BoxGeometry(0.12, 0.12, 1.6),
+      new THREE.MeshStandardMaterial({ color: '#111827' })
+    )
+    gunBody.position.z = 0.8
+    weapon.add(gunBody)
+
+    const gunStock = new THREE.Mesh(
+      new THREE.BoxGeometry(0.1, 0.25, 0.4),
+      new THREE.MeshStandardMaterial({ color: '#374151' })
+    )
+    gunStock.position.set(0, 0, -0.2)
+    weapon.add(gunStock)
+
+    weapon.position.set(0.7, 1.1, 0)
+    group.add(weapon)
+
+    return group
+  }
+
   const createMuzzleFlash = () => {
     const flash = new THREE.Mesh(
       new THREE.SphereGeometry(0.15, 8, 8),
@@ -118,18 +201,15 @@ export function PlayerController({ room, isDead = false, onMoveInput }: PlayerCo
     const linvel = rigidBodyRef.current.linvel()
     const position = rigidBodyRef.current.translation()
 
-    // Simple ground check
     raycaster.current.set(new THREE.Vector3(position.x, position.y + 0.1, position.z), new THREE.Vector3(0, -1, 0))
     const groundHits = raycaster.current.intersectObjects(scene.children, true)
     grounded.current = groundHits.length > 0 && groundHits[0].distance < 1.5
 
-    // Jumping
     if (keys.current.space && grounded.current) {
       rigidBodyRef.current.applyImpulse({ x: 0, y: jumpForce, z: 0 }, true)
       keys.current.space = false
     }
 
-    // Horizontal movement
     let moveX = 0
     let moveZ = 0
     if (keys.current.w) moveZ -= 1
@@ -149,17 +229,15 @@ export function PlayerController({ room, isDead = false, onMoveInput }: PlayerCo
       z: moveZ * speed
     }, true)
 
-    // Send to server
     if (Math.abs(moveX) > 0.1 || Math.abs(moveZ) > 0.1) {
       const seq = ++inputSeq.current
       room.send('move', { dx: moveX * speed * 0.016, dz: moveZ * speed * 0.016, seq })
       if (onMoveInput) onMoveInput({ dx: moveX * speed * 0.016, dz: moveZ * speed * 0.016, seq })
     }
 
-    // Camera follow
     camera.position.x = position.x
     camera.position.z = position.z
-    camera.position.y = position.y + 1.6
+    camera.position.y = position.y + 2.8
   })
 
   return (
@@ -171,10 +249,8 @@ export function PlayerController({ room, isDead = false, onMoveInput }: PlayerCo
       mass={80}
     >
       <CapsuleCollider args={[0.6, 1.2]} />
-      <mesh userData={{ isPlayer: true, sessionId: 'local' }}>
-        <capsuleGeometry args={[0.6, 1.2]} />
-        <meshStandardMaterial color={isDead ? '#666' : 'blue'} />
-      </mesh>
+      {/* Improved Humanoid Model */}
+      <primitive object={createHumanoidModel()} />
     </RigidBody>
   )
 }
