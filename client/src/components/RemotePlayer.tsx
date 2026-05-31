@@ -13,20 +13,20 @@ interface RemotePlayerProps {
 export function RemotePlayer({ position, rotationY = 0, name, health = 100, isDead = false }: RemotePlayerProps) {
   const meshRef = useRef<THREE.Group>(null!)
   const targetPos = useRef(new THREE.Vector3(position.x, position.y, position.z))
+  const velocity = useRef(new THREE.Vector3())
 
-  // Update target position when props change
-  if (meshRef.current) {
-    targetPos.current.set(position.x, position.y, position.z)
-  }
-
-  useFrame(() => {
+  useFrame((state, delta) => {
     if (!meshRef.current) return
 
-    // Simple interpolation for smooth movement
-    const currentPos = meshRef.current.position
-    currentPos.lerp(targetPos.current, 0.2) // 0.2 = interpolation speed
+    targetPos.current.set(position.x, position.y, position.z)
 
-    // Update rotation
+    const currentPos = meshRef.current.position
+    const diff = new THREE.Vector3().subVectors(targetPos.current, currentPos)
+
+    // Velocity-based smoothing for better remote player movement
+    velocity.current.lerp(diff.multiplyScalar(10), 0.25)
+    currentPos.add(velocity.current.clone().multiplyScalar(delta * 60))
+
     meshRef.current.rotation.y = rotationY
   })
 
@@ -36,13 +36,6 @@ export function RemotePlayer({ position, rotationY = 0, name, health = 100, isDe
         <capsuleGeometry args={[0.5, 1.5]} />
         <meshStandardMaterial color={isDead ? '#666' : '#ff6b6b'} />
       </mesh>
-      {/* Simple name tag */}
-      {name && (
-        <mesh position={[0, 3, 0]}>
-          <planeGeometry args={[4, 0.8]} />
-          <meshBasicMaterial color="black" transparent opacity={0.7} />
-        </mesh>
-      )}
     </group>
   )
 }
