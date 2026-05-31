@@ -1,4 +1,4 @@
-import { useRef, useEffect } from 'react'
+import { useRef, useEffect, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { RigidBody, CapsuleCollider } from '@react-three/rapier'
 import * as THREE from 'three'
@@ -20,6 +20,9 @@ export function PlayerController({ room, isDead = false, serverPosition, onMoveI
   const lastReconciledTime = useRef(0)
   const inputHistory = useRef<any[]>([])
 
+  // Weapon system
+  const [currentWeapon, setCurrentWeapon] = useState<'akm' | 'awm'>('akm')
+
   const { camera, scene } = useThree()
   const raycaster = useRef(new THREE.Raycaster())
 
@@ -38,6 +41,10 @@ export function PlayerController({ room, isDead = false, serverPosition, onMoveI
       if (key === 's') keys.current.s = true
       if (key === 'd') keys.current.d = true
       if (e.key === ' ') { keys.current.space = true; e.preventDefault() }
+
+      // Weapon switching (1 = AKM, 2 = AWM)
+      if (key === '1') setCurrentWeapon('akm')
+      if (key === '2') setCurrentWeapon('awm')
     }
 
     const handleKeyUp = (e: KeyboardEvent) => {
@@ -52,7 +59,14 @@ export function PlayerController({ room, isDead = false, serverPosition, onMoveI
     const handleClick = () => {
       if (!room) return
       createMuzzleFlash()
-      room.send('shoot', { targetId: 'none', damage: 25 })
+
+      // Different damage based on weapon
+      const weaponDamage = currentWeapon === 'akm' ? 28 : 85
+      room.send('shoot', { 
+        targetId: 'none', 
+        damage: weaponDamage,
+        weapon: currentWeapon 
+      })
     }
 
     window.addEventListener('keydown', handleKeyDown)
@@ -64,7 +78,7 @@ export function PlayerController({ room, isDead = false, serverPosition, onMoveI
       window.removeEventListener('keyup', handleKeyUp)
       window.removeEventListener('click', handleClick)
     }
-  }, [room, isDead])
+  }, [room, isDead, currentWeapon])
 
   useFrame(() => {
     if (!rigidBodyRef.current || !room || isDead) return
@@ -73,7 +87,7 @@ export function PlayerController({ room, isDead = false, serverPosition, onMoveI
     const linvel = body.linvel()
     const position = body.translation()
 
-    // === 加强的服务器校正 + 输入重放 ===
+    // Server reconciliation
     if (serverPosition) {
       const dist = Math.hypot(position.x - serverPosition.x, position.z - serverPosition.z)
 
@@ -82,7 +96,6 @@ export function PlayerController({ room, isDead = false, serverPosition, onMoveI
         if (now - lastReconciledTime.current > 250) {
           body.setTranslation(serverPosition, true)
 
-          // 重放最近输入
           inputHistory.current.forEach((input) => {
             const currentVel = body.linvel()
             body.setLinvel({
@@ -98,7 +111,7 @@ export function PlayerController({ room, isDead = false, serverPosition, onMoveI
       }
     }
 
-    // 记录输入历史
+    // Record input history
     if (keys.current.w || keys.current.s || keys.current.a || keys.current.d) {
       const currentInput = {
         dx: (keys.current.d ? 1 : 0) - (keys.current.a ? 1 : 0),
