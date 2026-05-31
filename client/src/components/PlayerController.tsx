@@ -1,6 +1,5 @@
 import { useRef, useEffect } from 'react'
-import { useFrame } from '@react-three/fiber'
-import { useKeyboardControls } from '@react-three/drei'
+import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 
 interface PlayerControllerProps {
@@ -9,36 +8,79 @@ interface PlayerControllerProps {
 
 export function PlayerController({ room }: PlayerControllerProps) {
   const meshRef = useRef<THREE.Group>(null!)
-  const velocity = useRef(new THREE.Vector3())
   const speed = 0.15
-
-  // Simple keyboard input (can be improved with useKeyboardControls)
   const keys = useRef({ w: false, a: false, s: false, d: false })
 
+  const { camera, scene } = useThree()
+  const raycaster = useRef(new THREE.Raycaster())
+
+  // Keyboard controls
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key.toLowerCase() === 'w') keys.current.w = true
-      if (e.key.toLowerCase() === 'a') keys.current.a = true
-      if (e.key.toLowerCase() === 's') keys.current.s = true
-      if (e.key.toLowerCase() === 'd') keys.current.d = true
+      const key = e.key.toLowerCase()
+      if (key === 'w') keys.current.w = true
+      if (key === 'a') keys.current.a = true
+      if (key === 's') keys.current.s = true
+      if (key === 'd') keys.current.d = true
     }
 
     const handleKeyUp = (e: KeyboardEvent) => {
-      if (e.key.toLowerCase() === 'w') keys.current.w = false
-      if (e.key.toLowerCase() === 'a') keys.current.a = false
-      if (e.key.toLowerCase() === 's') keys.current.s = false
-      if (e.key.toLowerCase() === 'd') keys.current.d = false
+      const key = e.key.toLowerCase()
+      if (key === 'w') keys.current.w = false
+      if (key === 'a') keys.current.a = false
+      if (key === 's') keys.current.s = false
+      if (key === 'd') keys.current.d = false
+    }
+
+    const handleClick = () => {
+      if (!room || !meshRef.current) return
+
+      // Client-side raycast for immediate feedback (prediction)
+      raycaster.current.setFromCamera(new THREE.Vector2(0, 0), camera)
+      const intersects = raycaster.current.intersectObjects(scene.children, true)
+
+      let hitInfo = null
+      for (const intersect of intersects) {
+        if (intersect.object.userData.isPlayer) {
+          hitInfo = {
+            targetId: intersect.object.userData.sessionId || 'self',
+            point: intersect.point
+          }
+          break
+        }
+      }
+
+      // Immediate local feedback
+      console.log('%c[CLIENT] Shot fired!', 'color: #4ade80')
+      if (hitInfo) {
+        console.log('%c[CLIENT] Hit detected (client prediction):', 'color: #f87171', hitInfo)
+        // TODO: Add hit effect (blood, hitmarker)
+      }
+
+      // Send to server (authoritative)
+      room.send('shoot', {
+        targetId: hitInfo?.targetId || 'none',
+        damage: 25,
+        direction: {
+          x: camera.getWorldDirection(new THREE.Vector3()).x,
+          y: camera.getWorldDirection(new THREE.Vector3()).y,
+          z: camera.getWorldDirection(new THREE.Vector3()).z
+        }
+      })
     }
 
     window.addEventListener('keydown', handleKeyDown)
     window.addEventListener('keyup', handleKeyUp)
+    window.addEventListener('click', handleClick)
 
     return () => {
       window.removeEventListener('keydown', handleKeyDown)
       window.removeEventListener('keyup', handleKeyUp)
+      window.removeEventListener('click', handleClick)
     }
-  }, [])
+  }, [room, camera, scene])
 
+  // Movement
   useFrame(() => {
     if (!meshRef.current || !room) return
 
@@ -49,11 +91,9 @@ export function PlayerController({ room }: PlayerControllerProps) {
     if (keys.current.a) input.dx -= speed
     if (keys.current.d) input.dx += speed
 
-    // Local movement (prediction)
     meshRef.current.position.x += input.dx
     meshRef.current.position.z += input.dz
 
-    // Send input to server (for sync)
     if (input.dx !== 0 || input.dz !== 0) {
       room.send('move', input)
     }
@@ -61,7 +101,7 @@ export function PlayerController({ room }: PlayerControllerProps) {
 
   return (
     <group ref={meshRef}>
-      <mesh>
+      <mesh userData={{ isPlayer: true, sessionId: 'local' }}>
         <capsuleGeometry args={[0.5, 1.5]} />
         <meshStandardMaterial color="blue" />
       </mesh>
